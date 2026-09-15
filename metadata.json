@@ -1,0 +1,6 @@
+{
+  "name": "Personal Command Center",
+  "description": "AI-powered personal activity, task, and financial management dashboard designed for seamless use across mobile and web.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

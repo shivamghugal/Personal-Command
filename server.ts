@@ -1,0 +1,568 @@
+import express, { Request, Response } from 'express';
+import path from 'path';
+import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
+
+dotenv.config();
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json({ limit: '10mb' }));
+
+// Lazy/safe initialization of Gemini AI
+const getAIClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+};
+
+// Health check
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    aiConfigured: !!process.env.GEMINI_API_KEY,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 1. Natural Language & Voice Task/Expense/Bill Extractor
+app.post('/api/ai/parse-task', async (req: Request, res: Response) => {
+  try {
+    const { text, userPreferences } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text prompt is required' });
+    }
+
+    const ai = getAIClient();
+    if (ai) {
+      const prompt = `You are a smart Personal Command Center assistant. Parse the following natural language voice/text input into structured task, expense, or bill data.
+Input: "${text}"
+Current Date Context: September 15, 2026 (Tuesday).
+User City/Currency: ${userPreferences?.currencyCode || 'INR'} (${userPreferences?.currencySymbol || '₹'}).
+Home: ${userPreferences?.homeLocation || 'Greenwood Residency, Sector 45'}
+Office: ${userPreferences?.officeLocation || 'Cyber City Tech Hub, Tower B'}
+
+Analyze whether the user is talking about:
+1. A Task (e.g., "Buy groceries while coming back from office", "Review database changes tomorrow morning")
+2. An Expense (e.g., "I spent 450 rupees on groceries", "Paid 120 for lunch")
+3. A Bill / Credit Card payment (e.g., "Remind me to pay electricity bill before Friday", "Pay credit card bill of 12000 rupees on the 20th")
+
+Respond with pure valid JSON only (no markdown, no backticks, no extra text):
+{
+  "type": "task" | "expense" | "bill",
+  "title": "Clean concise title",
+  "category": "Work" | "Personal" | "Finance" | "Health" | "Shopping" | "Family" | "Learning" | "Travel" | "Food" | "Groceries" | "Bills" | "Other",
+  "amount": number (if expense or bill, otherwise undefined),
+  "priority": "low" | "medium" | "high" | "urgent",
+  "dueDate": "YYYY-MM-DD",
+  "dueTime": "HH:mm" (optional),
+  "startTime": "HH:mm" (optional),
+  "context": "Context such as Office -> Home Commute or Office" (optional),
+  "location": "Suggested location or store name" (optional),
+  "locationBased": boolean,
+  "suggestedTime": "human readable time trigger" (optional),
+  "recurring": boolean,
+  "recurrencePattern": "daily" | "weekly" | "monthly" (optional),
+  "isEssential": boolean (for expenses, true if groceries, utility, medical, transport; false if dining out, luxury)
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
+
+      const responseText = response.text?.trim() || '{}';
+      const parsed = JSON.parse(responseText);
+      return res.json({ success: true, data: parsed, aiPowered: true });
+    }
+
+    // Intelligent Fallback if GEMINI_API_KEY is not set
+    const lower = text.toLowerCase();
+    const isExpense = lower.includes('spent') || lower.includes('paid ') || lower.includes('cost') || lower.includes('rupees') || lower.includes('rs') || lower.includes('₹');
+    const isBill = lower.includes('bill') || lower.includes('due') || lower.includes('credit card');
+
+    const amountMatch = text.match(/(?:₹|rs\.?|rupees|inr)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/i);
+    const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : undefined;
+
+    let category = 'Personal';
+    if (lower.includes('grocer') || lower.includes('milk') || lower.includes('vegetable')) category = 'Shopping';
+    else if (lower.includes('api') || lower.includes('code') || lower.includes('meeting') || lower.includes('work') || lower.includes('test')) category = 'Work';
+    else if (lower.includes('bill') || lower.includes('bank') || lower.includes('card') || lower.includes('money')) category = 'Finance';
+    else if (lower.includes('gym') || lower.includes('doctor') || lower.includes('run')) category = 'Health';
+
+    let context = undefined;
+    let location = undefined;
+    let locationBased = false;
+    if (lower.includes('coming back') || lower.includes('on way') || lower.includes('from office') || lower.includes('route')) {
+      context = 'Office → Home Commute';
+      location = 'Supermarket along commute route';
+      locationBased = true;
+    }
+
+    const fallbackResult = {
+      type: isExpense ? 'expense' : (isBill ? 'bill' : 'task'),
+      title: text.replace(/^(remind me to|i have to|i need to|spent \d+ on|spent)\s*/i, '').trim(),
+      category: isExpense && category === 'Shopping' ? 'Groceries' : category,
+      amount: amount,
+      priority: lower.includes('urgent') || lower.includes('tomorrow') || lower.includes('friday') ? 'high' : 'medium',
+      dueDate: '2026-09-15',
+      context,
+      location,
+      locationBased,
+      recurring: lower.includes('every ') || lower.includes('weekly') || lower.includes('daily'),
+      isEssential: category === 'Groceries' || category === 'Bills',
+    };
+
+    return res.json({ success: true, data: fallbackResult, aiPowered: false });
+  } catch (error: any) {
+    console.error('Error in /api/ai/parse-task:', error);
+    res.status(500).json({ error: error.message || 'Failed to parse task' });
+  }
+});
+
+// 2. AI Personal Assistant Chat (Context-Aware Connected Life)
+app.post('/api/ai/chat', async (req: Request, res: Response) => {
+  try {
+    const { message, context } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const ai = getAIClient();
+    if (ai) {
+      const systemInstruction = `You are "Command Center AI", an elite personal life operating assistant built for Shivam.
+Core Principle: You understand that work life, personal life, route/commute, and financial health are CONNECTED.
+Examples of connected reasoning:
+- Leaving office (18:30) connects to stopping by FreshMart to buy groceries, which generates an expense, affects monthly grocery spending, and touches the savings rate.
+- Paying a credit card bill (₹12,500 due Sep 20) relates to the available balance in HDFC Salary account (₹65,400) and impacts the monthly budget and savings goal progress.
+- Never directly execute irreversible financial movements without stating clear details and asking for confirmation.
+
+Current User State Context:
+- Name: Shivam
+- Today: Tuesday, September 15, 2026
+- Work Hours: 09:00 - 18:30
+- Office: Cyber City Tech Hub | Home: Greenwood Residency, Sector 45
+- Tasks: ${JSON.stringify(context?.tasks || [])}
+- Bank Accounts: ${JSON.stringify(context?.bankAccounts || [])}
+- Credit Cards: ${JSON.stringify(context?.creditCards || [])}
+- Bills: ${JSON.stringify(context?.bills || [])}
+- Today & Month Expenses: ${JSON.stringify(context?.expenses || [])}
+- Savings Goals: ${JSON.stringify(context?.savingsGoals || [])}
+
+Provide clear, encouraging, highly actionable advice. If the user asks what to do or wants a plan, prioritize:
+1. What to do NOW
+2. What is coming UP NEXT
+3. What is OVERDUE or URGENT
+4. Connected travel/grocery reminders
+5. Financial obligations due soon
+
+Respond with JSON format:
+{
+  "reply": "Your markdown-formatted response string",
+  "suggestedActions": ["Short clickable suggested prompt 1", "Suggested prompt 2"],
+  "toolCall": null or { "type": "create_task" | "create_expense" | "pay_bill" | "reschedule", "data": { ... } }
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: message,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+        },
+      });
+
+      const responseText = response.text?.trim() || '{}';
+      const parsed = JSON.parse(responseText);
+      return res.json({ success: true, ...parsed, aiPowered: true });
+    }
+
+    // High quality intelligent fallback if GEMINI_API_KEY is not set
+    const lower = message.toLowerCase();
+    let reply = '';
+    let suggestedActions = ['Plan my day', 'Show financial summary', 'Check schedule conflicts'];
+
+    if (lower.includes('what should i do') || lower.includes('today') || lower.includes('now')) {
+      reply = `**Here is your connected command center update for Tuesday, Sep 15:**
+
+1. **Current Focus**: Finish **Database Testing & Index Verification** before lunch (1:00 PM).
+2. **Upcoming Afternoon**: You have a **Code Review** session at 4:30 PM.
+3. **Smart Commute & Errand**: You are leaving the office at **18:30**. FreshMart is on your direct route home — your **Grocery Shopping** is planned for **19:00** so you don't have to make a separate trip later.
+4. **Finance Priority**: You have a **Bescom Electricity Bill (₹2,450)** scheduled for 21:00, and your **HDFC Credit Card bill (₹12,500)** is due in 5 days. You have **₹65,400** available in your salary account.
+
+Would you like me to generate an optimized time-blocked plan for today?`;
+      suggestedActions = ['✨ Plan My Day', 'Pay electricity bill', 'Review credit card details'];
+    } else if (lower.includes('financ') || lower.includes('money') || lower.includes('balance') || lower.includes('card')) {
+      reply = `### 💳 Financial Health Overview
+
+* **Total Available Liquid Cash**: ₹1,12,700 (HDFC Salary: ₹65,400 | SBI Savings: ₹42,500 | Cash: ₹4,800)
+* **Upcoming Bills Due**: ₹16,149 within 7 days (Electricity: ₹2,450 | Credit Card: ₹12,500 | Apartment: ₹3,500)
+* **Credit Card Outstanding**: ₹18,500 on HDFC Regalia (Statement Due: ₹12,500 by Sep 20)
+* **Monthly Savings Rate**: **41.6%** — You are on track for your **Emergency Fund** (₹65,000 / ₹1,00,000, 65%).
+
+**AI Recommendation**: Paying your credit card bill of ₹12,500 from your HDFC Salary account will leave you with a comfortable ₹52,900 balance before month-end salary credit.`;
+      suggestedActions = ['Pay HDFC Credit Card', 'Add expense', 'Check savings goals'];
+    } else {
+      reply = `I have updated your life dashboard. Your work schedule, commute route, and finances are fully synchronized.
+
+You currently have **2 tasks completed**, **3 tasks pending** for this evening, and **1 credit card bill due in 5 days**. Let me know if you want me to plan your day, optimize your schedule, or log an expense!`;
+    }
+
+    return res.json({
+      success: true,
+      reply,
+      suggestedActions,
+      aiPowered: false,
+    });
+  } catch (error: any) {
+    console.error('Error in /api/ai/chat:', error);
+    res.status(500).json({ error: error.message || 'AI assistant error' });
+  }
+});
+
+// 3. Plan My Day (AI Schedule Optimizer)
+app.post('/api/ai/plan-day', async (req: Request, res: Response) => {
+  try {
+    const { date, tasks, preferences } = req.body;
+    const ai = getAIClient();
+
+    if (ai) {
+      const prompt = `You are a life planner AI. Create an optimized, realistic chronological daily schedule for ${date || 'Tuesday, Sep 15, 2026'}.
+Work hours: ${preferences?.workStartTime || '09:00'} to ${preferences?.workEndTime || '18:30'}
+Commute: Office (${preferences?.officeLocation || 'Cyber City'}) to Home (${preferences?.homeLocation || 'Greenwood'})
+Tasks to schedule/integrate:
+${JSON.stringify(tasks || [])}
+
+Rules:
+- Respect work hours and realistic durations.
+- Factor in travel time (30 mins from office to home).
+- Insert errands like grocery shopping along the return route (e.g. 19:00 at FreshMart).
+- Flag any overlaps or conflicts.
+- Suggest a calm evening unwind and bill payment slot.
+
+Return pure JSON matching this schema:
+{
+  "date": "${date || '2026-09-15'}",
+  "summary": "High level strategic summary of today",
+  "schedule": [
+    {
+      "time": "09:00",
+      "endTime": "11:00",
+      "title": "API Development Sprint",
+      "category": "Work",
+      "priority": "high",
+      "location": "Office",
+      "note": "Complete REST endpoints before standup"
+    },
+    {
+      "time": "18:30",
+      "endTime": "19:00",
+      "title": "Leave Office & Commute Home",
+      "category": "Travel",
+      "priority": "medium",
+      "location": "Route Home",
+      "isCommute": true
+    },
+    {
+      "time": "19:00",
+      "endTime": "19:45",
+      "title": "🛒 Buy Groceries at FreshMart",
+      "category": "Shopping",
+      "priority": "high",
+      "location": "FreshMart Main Road",
+      "note": "Conveniently located on your commute route"
+    }
+  ],
+  "conflictWarnings": ["warning strings if any"],
+  "financialAdvice": "Financial note for today",
+  "groceryRecommendation": "Grocery timing note"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+
+      const responseText = response.text?.trim() || '{}';
+      const parsed = JSON.parse(responseText);
+      return res.json({ success: true, plan: parsed, aiPowered: true });
+    }
+
+    // Fallback Plan
+    const fallbackPlan = {
+      date: date || '2026-09-15',
+      summary: 'Focused deep work morning, clean commute with route-based grocery stop, and relaxed evening bill clearance.',
+      schedule: [
+        { time: '08:30', endTime: '09:00', title: 'Morning Setup & Priority Review', category: 'Personal', priority: 'medium', location: 'Office' },
+        { time: '09:00', endTime: '11:00', title: 'API Development Sprint', category: 'Work', priority: 'high', location: 'Office', note: 'Sprint-3 REST endpoints' },
+        { time: '11:00', endTime: '11:30', title: 'Team Standup & Sync', category: 'Work', priority: 'medium', location: 'Conference Room 2' },
+        { time: '11:30', endTime: '13:00', title: 'Database Testing & Index Tuning', category: 'Work', priority: 'high', location: 'Office' },
+        { time: '13:00', endTime: '14:00', title: 'Lunch & Relaxation Walk', category: 'Personal', priority: 'medium', location: 'Green Cafe' },
+        { time: '14:00', endTime: '16:30', title: 'Core Backend Development', category: 'Work', priority: 'high', location: 'Office' },
+        { time: '16:30', endTime: '18:00', title: 'Code Review & PR Approvals', category: 'Work', priority: 'medium', location: 'Office' },
+        { time: '18:30', endTime: '19:00', title: 'Leave Office & Commute Home', category: 'Travel', priority: 'medium', location: 'Office → Sector 45', isCommute: true },
+        { time: '19:00', endTime: '19:45', title: '🛒 Buy Groceries (FreshMart on Route)', category: 'Shopping', priority: 'high', location: 'FreshMart Main Road', note: 'Passing directly on your route home from office' },
+        { time: '20:00', endTime: '21:00', title: 'Dinner & Family Time', category: 'Personal', priority: 'low', location: 'Home' },
+        { time: '21:00', endTime: '21:15', title: '💡 Pay Electricity & Apartment Dues', category: 'Finance', priority: 'urgent', location: 'Home', note: 'Bescom bill of ₹2,450' },
+      ],
+      conflictWarnings: [
+        'Notice: You had 3 items originally clustered around 6:30 PM. We shifted grocery shopping to 7:00 PM right after leaving office to eliminate traffic backtrack.'
+      ],
+      financialAdvice: 'Your electricity bill (₹2,450) and maintenance (₹3,500) will deduct ₹5,950 from your HDFC Salary account. You still maintain ₹59,450 for the remaining month.',
+      groceryRecommendation: 'Shopping at FreshMart at 19:00 saves 35 minutes compared to a separate trip after reaching home.',
+    };
+
+    return res.json({ success: true, plan: fallbackPlan, aiPowered: false });
+  } catch (error: any) {
+    console.error('Error in /api/ai/plan-day:', error);
+    res.status(500).json({ error: error.message || 'Failed to plan day' });
+  }
+});
+
+// 4. Plan My Week (AI Weekly Planner)
+app.post('/api/ai/plan-week', async (req: Request, res: Response) => {
+  try {
+    const { weekOf, tasks, bills, expenses, goals } = req.body;
+    const ai = getAIClient();
+
+    if (ai) {
+      const prompt = `You are a holistic life architect AI. Generate a weekly execution and financial plan for the week of ${weekOf || 'September 15 - September 21, 2026'}.
+Pending tasks count: ${(tasks || []).length}
+Upcoming bills: ${JSON.stringify(bills || [])}
+Savings goals: ${JSON.stringify(goals || [])}
+
+Provide strategic weekly balance across:
+- Deep Work delivery
+- Errand & commute optimization
+- Timely bill payments (especially credit cards before due dates)
+- Maintaining the target savings rate (>40%)
+
+Return pure JSON:
+{
+  "weekOf": "${weekOf || 'Sep 15 - Sep 21, 2026'}",
+  "summary": "Weekly executive summary",
+  "priorities": ["Priority 1", "Priority 2", "Priority 3"],
+  "dailyHighlights": [
+    { "day": "Tuesday", "focus": "Backend API & DB Testing", "keyDeliverable": "Sprint-3 PR merge & Electricity bill payment" },
+    { "day": "Wednesday", "focus": "Gym & Security Testing", "keyDeliverable": "Auth rule validation" },
+    { "day": "Thursday", "focus": "Architecture Design", "keyDeliverable": "Notification service draft" },
+    { "day": "Friday", "focus": "Credit Card Payment & Review", "keyDeliverable": "Pay HDFC Regalia ₹12,500 due on Sunday" },
+    { "day": "Saturday", "focus": "Learning & Tech Deep Dive", "keyDeliverable": "TypeScript handbook chapter 4" },
+    { "day": "Sunday", "focus": "Weekly Finance Audit & Family", "keyDeliverable": "Review weekly spend & update Emergency Fund" }
+  ],
+  "financialOutlook": {
+    "upcomingBillsTotal": 16149,
+    "advice": "Total bills of ₹16,149 due this week. Clear credit card on Friday before the Sep 20 deadline."
+  }
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+
+      const responseText = response.text?.trim() || '{}';
+      const parsed = JSON.parse(responseText);
+      return res.json({ success: true, plan: parsed, aiPowered: true });
+    }
+
+    // Fallback Weekly Plan
+    const fallbackWeeklyPlan = {
+      weekOf: weekOf || 'Sep 15 - Sep 21, 2026',
+      summary: 'High-impact technical delivery week with critical financial clearance of HDFC Credit Card (due Sep 20) and Bescom utilities.',
+      priorities: [
+        'Deploy Sprint-3 API & Database indexing fixes',
+        'Pay HDFC Credit Card bill (₹12,500) before Sunday due date',
+        'Maintain daily fitness and route-efficient grocery procurement',
+      ],
+      dailyHighlights: [
+        { day: 'Tuesday, Sep 15', focus: 'Backend API & Grocery Route Run', keyDeliverable: 'Merge API PR, FreshMart groceries, clear electricity bill' },
+        { day: 'Wednesday, Sep 16', focus: 'Fitness & Database Performance', keyDeliverable: 'Morning gym workout & database query load test' },
+        { day: 'Thursday, Sep 17', focus: 'Lead Architecture Sync', keyDeliverable: 'Review notification engine RFC' },
+        { day: 'Friday, Sep 18', focus: 'Finance Action & Sprint Signoff', keyDeliverable: 'Pay HDFC credit card (₹12,500) ahead of weekend' },
+        { day: 'Saturday, Sep 19', focus: 'Recharge & System Design Study', keyDeliverable: '2 hours dedicated reading & laptop savings goal review' },
+        { day: 'Sunday, Sep 20', focus: 'Weekly Audit & Meal Prep', keyDeliverable: 'Weekly expense review and grocery planning' },
+      ],
+      financialOutlook: {
+        upcomingBillsTotal: 16149,
+        advice: 'Upcoming payments total ₹16,149 this week. Your HDFC Salary balance (₹65,400) comfortably covers this without dipping into emergency savings.',
+      },
+    };
+
+    return res.json({ success: true, plan: fallbackWeeklyPlan, aiPowered: false });
+  } catch (error: any) {
+    console.error('Error in /api/ai/plan-week:', error);
+    res.status(500).json({ error: error.message || 'Failed to plan week' });
+  }
+});
+
+// 5. Notes to Tasks Extractor
+app.post('/api/ai/notes-to-tasks', async (req: Request, res: Response) => {
+  try {
+    const { noteContent } = req.body;
+    if (!noteContent) {
+      return res.status(400).json({ error: 'Note content is required' });
+    }
+
+    const ai = getAIClient();
+    if (ai) {
+      const prompt = `Extract all actionable tasks from the following user note:
+"${noteContent}"
+
+Format output as pure JSON array:
+[
+  {
+    "title": "Task title",
+    "category": "Work" | "Personal" | "Finance" | "Health" | "Shopping",
+    "priority": "high" | "medium" | "low",
+    "suggestedDate": "2026-09-16",
+    "estimatedDuration": 30
+  }
+]`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
+
+      const responseText = response.text?.trim() || '[]';
+      const tasks = JSON.parse(responseText);
+      return res.json({ success: true, tasks, aiPowered: true });
+    }
+
+    // Fallback extraction
+    const lines = noteContent.split('\n').filter((l: string) => l.trim().length > 0);
+    const fallbackTasks = lines.slice(0, 3).map((line: string, idx: number) => ({
+      title: line.replace(/^[-*•\d.]+\s*/, '').trim(),
+      category: line.toLowerCase().includes('grocer') ? 'Shopping' : 'Work',
+      priority: idx === 0 ? 'high' : 'medium',
+      suggestedDate: '2026-09-16',
+      estimatedDuration: 45,
+    }));
+
+    return res.json({ success: true, tasks: fallbackTasks, aiPowered: false });
+  } catch (error: any) {
+    console.error('Error in /api/ai/notes-to-tasks:', error);
+    res.status(500).json({ error: error.message || 'Failed to extract tasks' });
+  }
+});
+
+// 6. Proactive Financial Insights
+app.post('/api/ai/financial-insights', async (req: Request, res: Response) => {
+  try {
+    const { income, expenses, bills, cards, savingsRate } = req.body;
+    const ai = getAIClient();
+
+    if (ai) {
+      const prompt = `Analyze user financial health and return 4 concise, high-value bullet insights:
+- Monthly Income: ₹${income || 95000}
+- Current Month Spending: ₹${expenses || 32500}
+- Upcoming Bills: ₹${bills || 16149}
+- Credit Card Outstanding: ₹${cards || 18500}
+- Current Savings Rate: ${savingsRate || 41.6}%
+
+Respond with JSON:
+{
+  "insights": [
+    { "type": "warning" | "positive" | "tip", "title": "Insight title", "detail": "Specific contextual analysis" }
+  ],
+  "safeToSpend": number,
+  "potentialSavings": number
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+
+      const responseText = response.text?.trim() || '{}';
+      const parsed = JSON.parse(responseText);
+      return res.json({ success: true, data: parsed, aiPowered: true });
+    }
+
+    const fallbackInsights = {
+      insights: [
+        {
+          type: 'warning',
+          title: 'HDFC Credit Card Due in 5 Days',
+          detail: 'Total ₹12,500 due on Sep 20. Your HDFC Salary account has ₹65,400 available, which can safely clear the balance in full without incurring interest.',
+        },
+        {
+          type: 'positive',
+          title: 'Healthy 41.6% Savings Rate',
+          detail: 'You have saved ₹25,000 this month. Emergency fund is at 65% (₹65,000 / ₹1,00,000) and tracking toward year-end completion.',
+        },
+        {
+          type: 'tip',
+          title: 'Route-Based Grocery Savings',
+          detail: 'Combining grocery shopping with your office return route reduced impulse dining expenses by ₹1,400 compared to last month.',
+        },
+        {
+          type: 'tip',
+          title: 'Potential Monthly Optimization',
+          detail: 'Trimming weekend dining out by ₹2,000 can accelerate your New MacBook Pro savings goal by 3 weeks.',
+        },
+      ],
+      safeToSpend: 18500,
+      potentialSavings: 3500,
+    };
+
+    return res.json({ success: true, data: fallbackInsights, aiPowered: false });
+  } catch (error: any) {
+    console.error('Error in /api/ai/financial-insights:', error);
+    res.status(500).json({ error: error.message || 'Financial insight error' });
+  }
+});
+
+// Vite middleware & Static Serving Setup
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req: Request, res: Response) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Command Center server running at http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();
