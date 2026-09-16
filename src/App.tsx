@@ -832,28 +832,37 @@ export default function App() {
       <div
         className={`flex-1 flex transition-all ${
           deviceMode === 'mobile'
-            ? 'justify-center items-start py-6 px-4 bg-neutral-900/50'
-            : 'w-full'
+            ? 'justify-center items-start py-6 px-4 bg-gradient-to-b from-[#080B11] via-[#0A0D15] to-[#07090E]'
+            : 'w-full bg-[#07090E] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(99,102,241,0.08),rgba(255,255,255,0))]'
         }`}
       >
         {/* If Mobile Mode is active, wrap in simulated device frame */}
         <div
           className={`flex-1 flex flex-col transition-all ${
             deviceMode === 'mobile'
-              ? 'max-w-[420px] h-[850px] bg-neutral-950 border-4 border-neutral-700/80 rounded-[44px] shadow-2xl overflow-hidden relative ring-8 ring-neutral-900/80'
+              ? 'max-w-[412px] h-[855px] bg-[#0A0D14] border-[7px] border-neutral-700/80 rounded-[52px] shadow-[0_30px_90px_-15px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.12)] overflow-hidden relative ring-1 ring-white/10'
               : 'w-full'
           }`}
         >
-          {/* Simulated Mobile Status Bar */}
+          {/* Simulated Mobile Flagship Status Bar & Dynamic Island */}
           {deviceMode === 'mobile' && (
-            <div className="h-9 bg-neutral-900/90 border-b border-neutral-800 px-6 flex items-center justify-between text-[11px] font-mono text-neutral-400 select-none z-30 shrink-0">
-              <span className="font-semibold text-white">09:41</span>
-              <div className="w-20 h-4 bg-neutral-950 rounded-full border border-neutral-800 flex items-center justify-center">
-                <span className="w-2 h-2 rounded-full bg-indigo-500/80"></span>
+            <div className="h-10 bg-[#0A0D14]/95 backdrop-blur-md border-b border-white/[0.06] px-6 flex items-center justify-between text-[11px] font-mono text-neutral-400 select-none z-30 shrink-0">
+              <span className="font-semibold text-white tracking-tight">09:41</span>
+              {/* Dynamic Island Pill */}
+              <div className="w-28 h-6 bg-black rounded-full border border-white/[0.08] flex items-center justify-between px-2.5 shadow-inner">
+                <div className="w-2.5 h-2.5 rounded-full bg-neutral-900 border border-neutral-700/80 flex items-center justify-center">
+                  <span className="w-1 h-1 rounded-full bg-neutral-600"></span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-[9px] text-neutral-400 font-sans font-medium">LIVE</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-neutral-300">
-                <span>5G</span>
-                <span>100%</span>
+              <div className="flex items-center gap-2 text-neutral-300">
+                <span className="text-[10px] font-sans font-bold text-neutral-400">5G</span>
+                <div className="w-5 h-2.5 rounded-sm border border-neutral-400/80 p-0.5 flex items-center">
+                  <div className="w-3.5 h-full bg-emerald-400 rounded-2xs"></div>
+                </div>
               </div>
             </div>
           )}
@@ -1011,6 +1020,13 @@ export default function App() {
             pendingTasksCount={pendingTasksCount}
             isSimulatedMobile={deviceMode === 'mobile'}
           />
+
+          {/* Simulated Mobile Bottom Home Swipe Bar */}
+          {deviceMode === 'mobile' && (
+            <div className="absolute bottom-1.5 left-0 right-0 pointer-events-none z-50 flex justify-center">
+              <div className="w-32 h-1 bg-white/30 rounded-full shadow-xs"></div>
+            </div>
+          )}
         </div>
       </div>
 

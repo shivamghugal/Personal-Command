@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isMobile = deviceMode === 'mobile' || deviceMode === 'mobile-frame';
 
   return (
-    <header className="sticky top-0 z-30 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 px-4 lg:px-6 py-3">
+    <header className="sticky top-0 z-30 bg-[#0a0d15]/85 backdrop-blur-xl border-b border-white/[0.08] px-4 lg:px-6 py-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
       <div className="flex items-center justify-between gap-3">
         {/* Left: Mobile Menu Toggle & Brand / Date */}
         <div className="flex items-center gap-3">
@@ -104,38 +104,56 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-toggle-mobile-menu"
               onClick={onToggleMobileMenu}
-              className="lg:hidden p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+              className="lg:hidden p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800/80 border border-neutral-700/40 transition-colors"
               aria-label="Toggle Navigation Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
           )}
 
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <h1 className="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
-                {preferences?.name || 'Shivam'}'s Command Center
-              </h1>
+          <div className="flex items-center gap-3">
+            {/* Brand Logo Shield */}
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 p-[1px] shadow-[0_0_15px_rgba(99,102,241,0.35)] shrink-0 hidden sm:block">
+              <div className="w-full h-full bg-[#0c0f18] rounded-xl flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+              </div>
             </div>
-            <p className="text-xs text-neutral-400 hidden sm:block">
-              {formattedDate} • <span className="text-neutral-300 font-mono">{formattedTime}</span>
-            </p>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+                  <span>{preferences?.name || 'Shivam'}</span>
+                  <span className="text-neutral-400 font-normal hidden md:inline">/</span>
+                  <span className="text-indigo-300 font-semibold hidden md:inline">Command Center</span>
+                </h1>
+                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-mono text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="hidden sm:inline">LIVE SYNC</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-neutral-400 hidden sm:flex items-center gap-2">
+                <span>{formattedDate}</span>
+                <span>•</span>
+                <span className="text-neutral-300 font-mono text-[10px] bg-neutral-800/80 px-1.5 py-0.2 rounded border border-neutral-700/40">
+                  {formattedTime}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Center: Quick Search Trigger */}
-        <div className="hidden md:flex flex-1 max-w-md mx-2">
+        <div className="hidden md:flex flex-1 max-w-md mx-4">
           <button
             id="btn-global-search-header"
             onClick={onOpenSearch || (() => setActiveTab?.('tasks'))}
-            className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-neutral-400 bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/60 rounded-xl transition-all group"
+            className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-neutral-400 bg-neutral-900/80 hover:bg-neutral-800/80 border border-white/[0.08] hover:border-indigo-500/40 rounded-xl transition-all shadow-inner group"
           >
-            <span className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-200" />
-              <span>Search tasks, bills, expenses, notes...</span>
+            <span className="flex items-center gap-2.5">
+              <Search className="w-3.5 h-3.5 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
+              <span className="text-neutral-400 group-hover:text-neutral-300">Search tasks, bills, expenses, ledger...</span>
             </span>
-            <kbd className="px-1.5 py-0.5 text-[10px] bg-neutral-900 border border-neutral-700 rounded text-neutral-400 font-mono">
+            <kbd className="px-2 py-0.5 text-[10px] bg-neutral-950/80 border border-neutral-700/60 rounded-md text-neutral-400 font-mono shadow-xs">
               ⌘K
             </kbd>
           </button>
@@ -145,13 +163,13 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Device Frame Switcher */}
           {setDeviceMode && (
-            <div className="hidden sm:flex items-center bg-neutral-800 p-0.5 rounded-xl border border-neutral-700/60">
+            <div className="hidden sm:flex items-center bg-[#0d1019] p-1 rounded-xl border border-white/[0.08] shadow-inner">
               <button
                 id="btn-view-responsive"
                 onClick={() => setDeviceMode('desktop')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-all ${
                   !isMobile
-                    ? 'bg-neutral-700 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-xs font-semibold'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
                 title="Full Web Desktop View"
@@ -162,9 +180,9 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="btn-view-mobile-frame"
                 onClick={() => setDeviceMode('mobile')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-all ${
                   isMobile
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-xs font-semibold'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
                 title="Simulate Mobile App Frame"
@@ -190,7 +208,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-header-voice-add"
               onClick={onOpenVoiceAdd}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition-all hover:scale-102"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 transition-all active:scale-95 shadow-xs"
               title="Voice Command & Quick Add"
             >
               <Mic className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
@@ -203,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-header-plan-day"
               onClick={onOpenPlanDay}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700/60 transition-all"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900/90 hover:bg-neutral-800 text-neutral-200 border border-white/[0.08] hover:border-white/[0.15] transition-all active:scale-95 shadow-xs"
               title="AI Plan My Day"
             >
               <CalendarIcon className="w-3.5 h-3.5 text-indigo-400" />
@@ -215,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="btn-header-ai-assistant"
             onClick={onOpenAI || (() => setActiveTab?.('ai'))}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-gradient-to-r from-violet-600/20 to-indigo-600/20 hover:from-violet-600/30 hover:to-indigo-600/30 text-violet-300 border border-violet-500/30 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-600/20 via-purple-600/20 to-indigo-600/20 hover:from-violet-600/30 hover:to-indigo-600/30 text-violet-200 border border-violet-500/35 hover:border-violet-500/60 transition-all active:scale-95 shadow-xs"
             title="Open AI Life Assistant"
           >
             <Sparkles className="w-3.5 h-3.5 text-violet-400" />
@@ -227,12 +245,12 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-header-notifications"
               onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
-              className="relative p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+              className="relative p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800/80 border border-transparent hover:border-white/[0.08] transition-all active:scale-95"
               aria-label="Notifications"
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-neutral-900"></span>
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full ring-2 ring-neutral-950 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></span>
               )}
             </button>
 

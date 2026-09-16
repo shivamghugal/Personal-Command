@@ -179,24 +179,27 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-indigo-400" />
-            <span>Task Management</span>
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-mono text-indigo-300 mb-1.5">
+            <CheckSquare className="w-3 h-3 text-indigo-400" />
+            <span>EXECUTIVE TASK WORKSPACE</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
+            <span>Task Orchestration</span>
           </h1>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Work, personal, errands, and connected commute reminders
+            Synchronized execution across work projects, personal life, commute routes & errand triggers
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             id="btn-voice-add-task"
             onClick={onOpenVoiceAdd}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all"
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-[#111624] hover:bg-[#181f33] text-indigo-300 border border-white/[0.08] hover:border-indigo-500/30 transition-all shadow-xs"
             title="Voice Task Input"
           >
             <Mic className="w-4 h-4 text-indigo-400" />
-            <span>Voice Task</span>
+            <span>Voice Command</span>
           </button>
           <button
             id="btn-create-task-modal"
@@ -204,7 +207,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               resetForm();
               setIsCreateModalOpen(true);
             }}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-[0_4px_16px_rgba(99,102,241,0.35)] transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>New Task</span>
@@ -213,23 +216,23 @@ export const TasksView: React.FC<TasksViewProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
+      <div className="p-4 sm:p-5 rounded-3xl bg-[#0b0e17] border border-white/[0.08] shadow-md space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               id="input-task-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tasks, descriptions, locations, or #tags..."
-              className="w-full pl-9 pr-4 py-2 bg-neutral-800 border border-neutral-700/80 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-indigo-500 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#111624] border border-white/[0.08] focus:border-indigo-500/60 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden transition-all shadow-inner"
             />
           </div>
 
           {/* Status Tab Filters */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <div className="p-1 bg-[#111624] rounded-xl border border-white/[0.06] flex items-center gap-1 overflow-x-auto pb-1 md:pb-1 custom-scrollbar shadow-inner">
             {[
               { id: 'all', label: 'All' },
               { id: 'today', label: 'Today' },
@@ -241,10 +244,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 key={tab.id}
                 id={`task-status-tab-${tab.id}`}
                 onClick={() => setSelectedStatus(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   selectedStatus === tab.id
-                    ? 'bg-neutral-700 text-white font-semibold'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
                 }`}
               >
                 {tab.label}
@@ -254,20 +257,20 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
 
         {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-neutral-800/80">
-          <span className="text-[11px] text-neutral-500 flex items-center gap-1 mr-1">
-            <Filter className="w-3 h-3" />
-            <span>Category:</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar pt-1 border-t border-white/[0.06]">
+          <span className="text-[11px] text-neutral-400 flex items-center gap-1 mr-1.5 font-medium">
+            <Filter className="w-3 h-3 text-neutral-500" />
+            <span>Filter:</span>
           </span>
           {categories.map((cat) => (
             <button
               key={cat}
               id={`task-cat-pill-${cat}`}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+              className={`px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
                 selectedCategory === cat
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700/60'
+                  ? 'bg-white/[0.12] text-white border border-white/[0.2] font-semibold'
+                  : 'bg-white/[0.03] text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.06] border border-white/[0.04]'
               }`}
             >
               {cat}
@@ -279,12 +282,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {/* Task List */}
       <div className="space-y-3">
         {filteredTasks.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
-            <div className="w-12 h-12 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center mx-auto">
+          <div className="p-12 text-center rounded-3xl bg-[#0b0e17] border border-white/[0.08] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-neutral-800 text-neutral-400 flex items-center justify-center mx-auto border border-white/[0.06]">
               <CheckSquare className="w-6 h-6" />
             </div>
-            <p className="text-sm font-semibold text-neutral-300">No tasks found</p>
-            <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+            <p className="text-sm font-semibold text-neutral-200">No tasks found</p>
+            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
               No tasks match your current filter or search criteria. Try clearing filters or create a new task.
             </p>
             <button
@@ -294,7 +297,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 setSelectedStatus('all');
                 setSelectedPriority('all');
               }}
-              className="text-xs text-indigo-400 hover:underline font-medium"
+              className="text-xs text-indigo-400 hover:underline font-semibold"
             >
               Reset all filters
             </button>
@@ -308,45 +311,49 @@ export const TasksView: React.FC<TasksViewProps> = ({
               <div
                 key={task.id}
                 id={`task-item-${task.id}`}
-                className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                className={`p-4 sm:p-5 rounded-3xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-start justify-between gap-3 relative overflow-hidden group shadow-xs ${
                   isCompleted
-                    ? 'bg-neutral-900/40 border-neutral-800/60 opacity-80'
+                    ? 'bg-[#0d101a]/50 border-white/[0.04] opacity-70'
                     : isInProgress
-                    ? 'bg-indigo-950/20 border-indigo-500/40 shadow-sm'
-                    : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                    ? 'bg-indigo-950/25 border-indigo-500/40 shadow-[0_0_25px_rgba(99,102,241,0.18)] ring-1 ring-indigo-500/30'
+                    : 'bg-[#0f1320]/80 border-white/[0.07] hover:border-white/[0.15] hover:bg-[#131828]/90'
                 }`}
               >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
+                {isInProgress && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-violet-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+                )}
+
+                <div className="flex items-start gap-3.5 flex-1 min-w-0">
                   {/* Status Checkbox */}
                   <button
                     onClick={() => onToggleTaskStatus(task.id)}
-                    className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                    className={`mt-0.5 w-5 h-5 rounded-lg flex items-center justify-center transition-all ${
                       isCompleted
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-emerald-500 text-neutral-950 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
                         : 'border border-neutral-600 hover:border-indigo-400 bg-neutral-800/60'
                     }`}
                     title={isCompleted ? 'Mark pending' : 'Mark completed'}
                   >
-                    {isCompleted && <Check className="w-3.5 h-3.5" />}
+                    {isCompleted && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </button>
 
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Category Badge */}
-                      <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-neutral-800 text-neutral-300 border border-neutral-700">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-white/[0.05] text-neutral-300 border border-white/[0.08]">
                         {task.category}
                       </span>
 
                       {/* Priority */}
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
                           task.priority === 'urgent'
                             ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                             : task.priority === 'high'
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                             : task.priority === 'medium'
-                            ? 'bg-blue-500/10 text-blue-300'
-                            : 'bg-neutral-800 text-neutral-400'
+                            ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20'
+                            : 'bg-neutral-800/80 text-neutral-400'
                         }`}
                       >
                         {task.priority}
@@ -354,7 +361,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
                       {/* Schedule timing */}
                       {(task.startTime || task.dueTime) && (
-                        <span className="text-[11px] font-mono text-neutral-300 bg-neutral-800/80 px-2 py-0.5 rounded flex items-center gap-1">
+                        <span className="text-[11px] font-mono text-neutral-300 bg-neutral-800/80 px-2 py-0.5 rounded-md border border-neutral-700/50 flex items-center gap-1">
                           <Clock className="w-3 h-3 text-neutral-400" />
                           <span>
                             {task.startTime || ''}
@@ -365,14 +372,14 @@ export const TasksView: React.FC<TasksViewProps> = ({
                       )}
 
                       {/* Due date */}
-                      <span className="text-[11px] text-neutral-400 flex items-center gap-1">
+                      <span className="text-[11px] text-neutral-400 flex items-center gap-1 font-mono">
                         <CalendarIcon className="w-3 h-3 text-neutral-500" />
                         <span>{task.dueDate}</span>
                       </span>
 
                       {/* Recurrence badge */}
                       {task.recurring && (
-                        <span className="text-[10px] text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <span className="text-[10px] text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
                           <Repeat className="w-3 h-3" />
                           <span>{task.recurrencePattern}</span>
                         </span>
@@ -380,8 +387,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
                       {/* AI Generated tag */}
                       {task.aiGenerated && (
-                        <span className="text-[10px] text-violet-300 bg-violet-950/60 border border-violet-800/50 px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
+                        <span className="text-[10px] text-violet-300 bg-violet-950/60 border border-violet-800/50 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                          <Sparkles className="w-3 h-3 text-violet-400" />
                           <span>AI Route</span>
                         </span>
                       )}
@@ -404,7 +411,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     {/* Location & Context */}
                     {(task.location || task.context) && (
                       <div className="flex items-center gap-1.5 text-xs text-indigo-300 pt-0.5">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
                         <span>
                           {task.location} {task.context ? `• ${task.context}` : ''}
                         </span>

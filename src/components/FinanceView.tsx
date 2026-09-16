@@ -344,26 +344,31 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner & Net Worth Overview */}
-      <div className="bg-gradient-to-br from-neutral-900 via-neutral-900 to-indigo-950/40 p-6 sm:p-7 rounded-2xl border border-neutral-800 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#121626] via-[#0e121d] to-[#090c14] p-6 sm:p-8 rounded-3xl border border-white/[0.09] shadow-[0_20px_50px_rgba(0,0,0,0.6)] relative overflow-hidden">
+        {/* Subtle decorative glows */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/[0.07] rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+        <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-emerald-500/[0.04] rounded-full blur-2xl pointer-events-none"></div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider block mb-1">
-              Personal Financial Balance Sheet
-            </span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.09] backdrop-blur-md text-xs text-indigo-300 font-mono mb-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+              <span>EXECUTIVE FINANCIAL BALANCE SHEET</span>
+            </div>
             <div className="flex items-baseline gap-3">
               <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-mono">
                 {preferences.currencySymbol}{netWorth.toLocaleString('en-IN')}
               </h1>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${netWorth >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
-                {netWorth >= 0 ? 'Positive Net Worth' : 'Net Liability'}
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${netWorth >= 0 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/15 border-rose-500/30 text-rose-300'}`}>
+                {netWorth >= 0 ? 'Positive Net Worth' : 'Net Liability Position'}
               </span>
             </div>
-            <p className="text-xs text-neutral-400 mt-2 flex items-center gap-4 flex-wrap">
-              <span>Liquid Assets: <strong className="text-emerald-400">{preferences.currencySymbol}{totalLiquidBalance.toLocaleString('en-IN')}</strong></span>
-              <span>•</span>
-              <span>Receivables (Owed to you): <strong className="text-cyan-400">{preferences.currencySymbol}{totalOwedToUser.toLocaleString('en-IN')}</strong></span>
-              <span>•</span>
-              <span>Liabilities (Cards & Debts): <strong className="text-rose-400">{preferences.currencySymbol}{totalLiabilities.toLocaleString('en-IN')}</strong></span>
+            <p className="text-xs text-neutral-400 mt-2.5 flex items-center gap-3.5 flex-wrap">
+              <span>Liquid Assets: <strong className="text-emerald-400 font-mono">{preferences.currencySymbol}{totalLiquidBalance.toLocaleString('en-IN')}</strong></span>
+              <span className="text-neutral-600">•</span>
+              <span>Receivables (Owed to you): <strong className="text-cyan-400 font-mono">{preferences.currencySymbol}{totalOwedToUser.toLocaleString('en-IN')}</strong></span>
+              <span className="text-neutral-600">•</span>
+              <span>Liabilities (Cards & Debts): <strong className="text-rose-400 font-mono">{preferences.currencySymbol}{totalLiabilities.toLocaleString('en-IN')}</strong></span>
             </p>
           </div>
 
@@ -372,7 +377,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <button
               id="btn-quick-add-expense"
               onClick={() => setIsAddExpenseOpen(true)}
-              className="px-3.5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+              className="px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white rounded-xl flex items-center gap-1.5 shadow-[0_4px_16px_rgba(99,102,241,0.35)] transition-all active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Record Expense</span>
@@ -381,7 +386,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               id="btn-quick-transfer"
               onClick={() => setIsTransferOpen(true)}
               disabled={bankAccounts.length < 2}
-              className="px-3.5 py-2 text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3.5 py-2.5 text-xs font-semibold bg-[#121624] hover:bg-[#181f33] border border-white/[0.09] hover:border-white/[0.18] text-white rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-xs"
             >
               <ArrowLeftRight className="w-4 h-4 text-cyan-400" />
               <span>Transfer Funds</span>
@@ -389,7 +394,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <button
               id="btn-quick-add-debt"
               onClick={() => setIsAddDebtOpen(true)}
-              className="px-3.5 py-2 text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white rounded-xl flex items-center gap-1.5 transition-colors"
+              className="px-3.5 py-2.5 text-xs font-semibold bg-[#121624] hover:bg-[#181f33] border border-white/[0.09] hover:border-white/[0.18] text-white rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
             >
               <Building2 className="w-4 h-4 text-amber-400" />
               <span>Add Debt / Loan</span>
@@ -399,7 +404,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-neutral-800 scrollbar-none">
+      <div className="p-1 bg-[#0b0e17] rounded-2xl border border-white/[0.08] flex items-center gap-1 overflow-x-auto custom-scrollbar shadow-inner">
         {[
           { id: 'overview', label: 'Overview', icon: PieChart },
           { id: 'accounts', label: `Accounts (${bankAccounts.length})`, icon: Wallet },
@@ -419,11 +424,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
                 isActive
-                  ? 'bg-neutral-800 text-white border border-neutral-700 shadow-xs'
-                  : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900'
+                  ? 'bg-indigo-600 text-white shadow-sm font-bold'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-neutral-500'}`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-neutral-400'}`} />
               <span>{tab.label}</span>
             </button>
           );
@@ -435,29 +440,29 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         <div className="space-y-6">
           {/* Key Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-              <span className="text-xs text-neutral-400 block mb-1">Total Liquid Cash</span>
-              <span className="text-xl font-bold text-white font-mono block">
+            <div className="p-4 sm:p-5 rounded-3xl bg-[#0b0e17] border border-white/[0.08] shadow-md relative overflow-hidden group">
+              <span className="text-xs text-neutral-400 block mb-1 font-medium">Total Liquid Cash</span>
+              <span className="text-2xl font-extrabold text-white font-mono block">
                 {preferences.currencySymbol}{totalLiquidBalance.toLocaleString('en-IN')}
               </span>
-              <span className="text-[11px] text-neutral-500 mt-1 block">
+              <span className="text-[11px] text-neutral-400 mt-1 block">
                 Across {bankAccounts.length} savings & cash accounts
               </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-              <span className="text-xs text-neutral-400 block mb-1">Total Liabilities</span>
-              <span className="text-xl font-bold text-rose-400 font-mono block">
+            <div className="p-4 sm:p-5 rounded-3xl bg-[#0b0e17] border border-white/[0.08] shadow-md relative overflow-hidden group">
+              <span className="text-xs text-neutral-400 block mb-1 font-medium">Total Liabilities</span>
+              <span className="text-2xl font-extrabold text-rose-400 font-mono block">
                 {preferences.currencySymbol}{totalLiabilities.toLocaleString('en-IN')}
               </span>
-              <span className="text-[11px] text-neutral-500 mt-1 block">
+              <span className="text-[11px] text-neutral-400 mt-1 block">
                 Cards ({preferences.currencySymbol}{totalCardOutstanding.toLocaleString('en-IN')}) + Debts ({preferences.currencySymbol}{totalUserOwes.toLocaleString('en-IN')})
               </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-              <span className="text-xs text-neutral-400 block mb-1">Upcoming Bills</span>
-              <span className="text-xl font-bold text-amber-400 font-mono block">
+            <div className="p-4 sm:p-5 rounded-3xl bg-[#0b0e17] border border-white/[0.08] shadow-md relative overflow-hidden group">
+              <span className="text-xs text-neutral-400 block mb-1 font-medium">Upcoming Bills</span>
+              <span className="text-2xl font-extrabold text-amber-400 font-mono block">
                 {preferences.currencySymbol}{upcomingBillsTotal.toLocaleString('en-IN')}
               </span>
               <span className="text-[11px] text-neutral-500 mt-1 block">
