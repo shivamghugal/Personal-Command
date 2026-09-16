@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "User profile and settings",
+      "fields": {
+        "userId": { "type": "string", "description": "Unique user ID" },
+        "name": { "type": "string", "description": "User's display name" },
+        "email": { "type": "string", "description": "User's email" },
+        "monthlyIncome": { "type": "number", "description": "Monthly income in INR" },
+        "currency": { "type": "string", "description": "Currency code" },
+        "workLocation": { "type": "string", "description": "Office location" },
+        "homeLocation": { "type": "string", "description": "Home location" }
+      }
+    },
+    "tasks": {
+      "title": "Tasks",
+      "description": "User activity, personal, and work tasks",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Task title" },
+        "description": { "type": "string", "description": "Task description" },
+        "category": { "type": "string", "description": "Task category" },
+        "priority": { "type": "string", "description": "Task priority: low, medium, high, urgent" },
+        "status": { "type": "string", "description": "Status: pending, in_progress, completed, postponed" },
+        "dueDate": { "type": "string", "description": "Due date YYYY-MM-DD" },
+        "dueTime": { "type": "string", "description": "Due time HH:mm" },
+        "estimatedMinutes": { "type": "number", "description": "Estimated duration in minutes" },
+        "commuteRelevant": { "type": "boolean", "description": "Whether task is along commute route" },
+        "location": { "type": "string", "description": "Optional location" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "bankAccounts": {
+      "title": "Bank Accounts",
+      "description": "Connected or tracked bank accounts",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "bankName": { "type": "string", "description": "Bank name" },
+        "accountType": { "type": "string", "description": "savings, checking, current" },
+        "accountNumberMasked": { "type": "string", "description": "Masked account number" },
+        "currentBalance": { "type": "number", "description": "Ledger balance" },
+        "availableBalance": { "type": "number", "description": "Spendable balance" },
+        "color": { "type": "string", "description": "Accent color" }
+      }
+    },
+    "creditCards": {
+      "title": "Credit Cards",
+      "description": "Credit cards and billing cycle tracking",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "cardName": { "type": "string", "description": "Card brand and title" },
+        "bankName": { "type": "string", "description": "Issuing bank" },
+        "lastFourDigits": { "type": "string", "description": "Last 4 digits" },
+        "creditLimit": { "type": "number", "description": "Total limit" },
+        "currentOutstanding": { "type": "number", "description": "Current due" },
+        "availableCredit": { "type": "number", "description": "Available limit" },
+        "dueDate": { "type": "string", "description": "Due date YYYY-MM-DD" }
+      }
+    },
+    "bills": {
+      "title": "Bills & Subscriptions",
+      "description": "Recurring utility bills and subscriptions",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Bill name" },
+        "category": { "type": "string", "description": "Utility, rent, subscription, etc." },
+        "amount": { "type": "number", "description": "Bill amount" },
+        "dueDate": { "type": "string", "description": "Due date YYYY-MM-DD" },
+        "status": { "type": "string", "description": "upcoming, due_today, overdue, paid" },
+        "autoPay": { "type": "boolean", "description": "Auto pay enabled" }
+      }
+    },
+    "expenses": {
+      "title": "Expenses",
+      "description": "Logged expenditure and transactions",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Expense title" },
+        "amount": { "type": "number", "description": "Expense amount" },
+        "category": { "type": "string", "description": "Category" },
+        "date": { "type": "string", "description": "Date YYYY-MM-DD" },
+        "paymentMethod": { "type": "string", "description": "UPI, Credit Card, Cash, etc." },
+        "isEssential": { "type": "boolean", "description": "Essential vs non-essential" }
+      }
+    },
+    "savingsGoals": {
+      "title": "Savings Goals",
+      "description": "Financial goals and emergency funds",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Goal title" },
+        "targetAmount": { "type": "number", "description": "Target amount" },
+        "currentAmount": { "type": "number", "description": "Accumulated amount" },
+        "targetDate": { "type": "string", "description": "Target deadline" }
+      }
+    },
+    "notes": {
+      "title": "Notes",
+      "description": "Personal and scratchpad notes",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Note title" },
+        "content": { "type": "string", "description": "Note body" },
+        "tags": { "type": "array", "description": "List of tags" },
+        "isPinned": { "type": "boolean", "description": "Pin status" }
+      }
+    }
+  }
+}
