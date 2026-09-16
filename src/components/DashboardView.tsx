@@ -1,22 +1,20 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
-  ShoppingCart, 
   CreditCard as CreditCardIcon, 
   Sparkles, 
   MapPin, 
-  ArrowRight, 
-  Calendar as CalendarIcon, 
-  TrendingUp, 
   ChevronRight, 
   Play, 
   Pause, 
   Check, 
-  Zap,
-  DollarSign,
-  Compass
+  DollarSign, 
+  Compass,
+  Building2,
+  TrendingUp,
+  ArrowRight
 } from 'lucide-react';
 import { 
   Task, 
@@ -26,7 +24,8 @@ import {
   Expense, 
   SavingsGoal, 
   UserPreferences, 
-  TaskStatus 
+  TaskStatus,
+  Debt 
 } from '../types';
 
 interface DashboardViewProps {
@@ -37,6 +36,7 @@ interface DashboardViewProps {
   creditCards: CreditCard[];
   expenses: Expense[];
   savingsGoals: SavingsGoal[];
+  debts?: Debt[];
   onToggleTaskStatus: (taskId: string) => void;
   onUpdateTaskStatus: (taskId: string, status: TaskStatus) => void;
   onOpenPlanDay: () => void;
@@ -53,6 +53,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   creditCards = [],
   expenses = [],
   savingsGoals = [],
+  debts = [],
   onToggleTaskStatus,
   onUpdateTaskStatus,
   onOpenPlanDay,
@@ -65,6 +66,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const safeAccounts = bankAccounts || [];
   const safeCards = creditCards || [];
   const safeExpenses = expenses || [];
+  const safeDebts = debts || [];
+
+  // Current Date & Dynamic Greeting
+  const now = new Date();
+  const currentHour = now.getHours();
+  const greeting = currentHour < 12 ? 'Good Morning' : currentHour < 17 ? 'Good Afternoon' : 'Good Evening';
+  const todayFormatted = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const todayDateStr = now.toISOString().split('T')[0];
 
   // Compute key stats
   const completedTasks = safeTasks.filter((t) => t.status === 'completed');
@@ -72,28 +81,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalTasks = safeTasks.length;
   const progressPercent = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
-  // Upcoming bills due within 7 days
+  // Upcoming bills due
   const upcomingBills = safeBills.filter((b) => b.status !== 'paid');
-  const creditCardDueSoon = safeCards.find((c) => c.currentOutstanding > 0);
+  const nextBill = upcomingBills[0];
+
+  // Credit card due soon
+  const cardWithHighestDue = [...safeCards]
+    .filter((c) => c.currentOutstanding > 0)
+    .sort((a, b) => b.currentOutstanding - a.currentOutstanding)[0];
+
+  // Debts aggregates
+  const totalUserOwes = safeDebts
+    .filter((d) => d.direction === 'owe' && d.status !== 'settled')
+    .reduce((sum, d) => sum + (d.outstandingAmount || 0), 0);
+
+  const totalOwedToUser = safeDebts
+    .filter((d) => d.direction === 'owed_to_me' && d.status !== 'settled')
+    .reduce((sum, d) => sum + (d.outstandingAmount || 0), 0);
 
   // Financial aggregates
   const totalLiquidBalance = safeAccounts.reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
-  const availableBalance = safeAccounts.reduce((sum, acc) => sum + (acc.availableBalance || 0), 0);
+  const availableBalance = safeAccounts.reduce((sum, acc) => sum + (acc.availableBalance ?? acc.currentBalance ?? 0), 0);
   const totalCCOutstanding = safeCards.reduce((sum, c) => sum + (c.currentOutstanding || 0), 0);
+  const totalLiabilities = totalCCOutstanding + totalUserOwes;
+  const totalAssets = totalLiquidBalance + totalOwedToUser;
+  const netWorth = totalAssets - totalLiabilities;
+
   const monthlySpending = safeExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const monthlyIncome = preferences?.monthlyIncome || 95000;
   const monthlySavings = monthlyIncome - monthlySpending;
   const savingsRate = monthlyIncome > 0 ? Math.round((monthlySavings / monthlyIncome) * 100) : 0;
 
-  // Chronological tasks for Today (2026-09-15)
-  const todayTasks = [...safeTasks].sort((a, b) => {
-    const timeA = a.startTime || a.dueTime || '99:99';
-    const timeB = b.startTime || b.dueTime || '99:99';
-    return timeA.localeCompare(timeB);
-  });
+  // Tasks ordered by time
+  const sortedTasks = useMemo(() => {
+    return [...safeTasks].sort((a, b) => {
+      const timeA = a.startTime || a.dueTime || '99:99';
+      const timeB = b.startTime || b.dueTime || '99:99';
+      return timeA.localeCompare(timeB);
+    });
+  }, [safeTasks]);
 
   // Next upcoming pending task
-  const upNextTask = todayTasks.find((t) => t.status === 'pending' || t.status === 'in_progress');
+  const upNextTask = sortedTasks.find((t) => t.status === 'pending' || t.status === 'in_progress');
+
+  // Commute / route task if any
+  const commuteTask = sortedTasks.find((t) => t.location || t.context?.toLowerCase().includes('commute') || t.category === 'Shopping');
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -106,13 +138,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-neutral-800/80 border border-neutral-700/60 text-xs text-neutral-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Tuesday, September 15 • Today</span>
+              <span>{todayFormatted} • Live Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Good Morning, {preferences.name} 👋
+              {greeting}, {preferences.name} 👋
             </h1>
             <p className="text-sm text-neutral-400 max-w-xl">
-              Here is your holistic command center for work, commute, and personal finances.
+              Connected life, commute schedule, and real-time personal balance sheet.
             </p>
           </div>
 
@@ -141,7 +173,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="bg-neutral-800/50 p-3 rounded-xl border border-neutral-700/40">
             <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Today's Progress</span>
+              <span>Task Progress</span>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-bold text-white font-mono">{progressPercent}%</span>
@@ -162,40 +194,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-bold text-white font-mono">{pendingTasks.length}</span>
-              <span className="text-[11px] text-neutral-400">tasks pending</span>
+              <span className="text-[11px] text-neutral-400">pending</span>
             </div>
             <p className="text-[10px] text-indigo-400 mt-1 truncate">
-              Up next: {upNextTask ? upNextTask.title : 'All done!'}
+              Up next: {upNextTask ? upNextTask.title : 'All caught up!'}
             </p>
           </div>
 
           <div className="bg-neutral-800/50 p-3 rounded-xl border border-neutral-700/40">
             <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Bills Due</span>
+              <span>Bills Pending</span>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-lg font-bold text-amber-400 font-mono">
                 {upcomingBills.length}
               </span>
-              <span className="text-[11px] text-neutral-400">pending this week</span>
+              <span className="text-[11px] text-neutral-400">bills</span>
             </div>
-            <p className="text-[10px] text-amber-300 mt-1">
-              Electricity due Sep 18
+            <p className="text-[10px] text-amber-300 mt-1 truncate">
+              {nextBill ? `${nextBill.name} (${preferences.currencySymbol}${nextBill.amount.toLocaleString('en-IN')})` : 'No pending bills'}
             </p>
           </div>
 
           <div className="bg-neutral-800/50 p-3 rounded-xl border border-neutral-700/40">
             <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
               <CreditCardIcon className="w-3.5 h-3.5 text-rose-400" />
-              <span>Credit Card Due</span>
+              <span>Card Outstanding</span>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-bold text-rose-400 font-mono">₹12,500</span>
-              <span className="text-[11px] text-neutral-400">in 5 days</span>
+              <span className="text-lg font-bold text-rose-400 font-mono">
+                {preferences.currencySymbol}{totalCCOutstanding.toLocaleString('en-IN')}
+              </span>
             </div>
-            <p className="text-[10px] text-neutral-400 mt-1">
-              HDFC Regalia Gold
+            <p className="text-[10px] text-neutral-400 mt-1 truncate">
+              {cardWithHighestDue ? `${cardWithHighestDue.name} • Due ${cardWithHighestDue.paymentDueDate}` : 'No balance due'}
             </p>
           </div>
         </div>
@@ -208,10 +241,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="text-xs">
               <span className="font-semibold text-violet-200 block">
-                AI Recommendation for Shivam:
+                Command Intelligence:
               </span>
               <p className="text-neutral-300 mt-0.5 leading-relaxed">
-                Complete the <strong>API & Database testing</strong> before lunch. When leaving office at 18:30, buy groceries at <strong>FreshMart</strong> directly on your commute route home.
+                {upNextTask ? (
+                  <>
+                    Priority task is <strong>"{upNextTask.title}"</strong>
+                    {upNextTask.startTime ? ` at ${upNextTask.startTime}` : ''}.
+                    {commuteTask && commuteTask.id !== upNextTask.id ? (
+                      <> You also have <strong>"{commuteTask.title}"</strong> planned on your commute route.</>
+                    ) : (
+                      <> Your estimated monthly savings rate is <strong>{savingsRate}%</strong>.</>
+                    )}
+                  </>
+                ) : (
+                  <>All scheduled tasks completed. You are on track with your finances and schedule.</>
+                )}
               </p>
             </div>
           </div>
@@ -219,13 +264,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={onOpenPlanDay}
             className="text-xs font-semibold text-violet-300 hover:text-white px-3 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/30 transition-all shrink-0 flex items-center gap-1 self-end sm:self-auto"
           >
-            <span>Apply Schedule</span>
+            <span>Optimize Schedule</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* 2. Connected Life Pipeline Visualizer (The Defining Feature) */}
+      {/* 2. Connected Life Pipeline Visualizer */}
       <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -235,53 +280,65 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </h2>
           </div>
           <span className="text-[11px] text-neutral-400">
-            How your work, commute, and wallet connect
+            Work, commute route & financial synchronization
           </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="p-2.5 rounded-xl bg-neutral-800/70 border border-neutral-700/50">
             <span className="text-[10px] text-neutral-400 font-mono block">STEP 1 • WORK</span>
-            <span className="font-semibold text-neutral-200 block mt-0.5">Office Schedule</span>
-            <span className="text-[11px] text-neutral-400 block mt-1">Leaves at 18:30 PM</span>
+            <span className="font-semibold text-neutral-200 block mt-0.5">Office & Projects</span>
+            <span className="text-[11px] text-neutral-400 block mt-1">
+              {sortedTasks.find((t) => t.category === 'Work')?.title || 'Work Schedule'}
+            </span>
           </div>
 
           <div className="p-2.5 rounded-xl bg-neutral-800/70 border border-neutral-700/50">
             <span className="text-[10px] text-neutral-400 font-mono block">STEP 2 • ROUTE</span>
             <span className="font-semibold text-neutral-200 block mt-0.5">Commute Trigger</span>
-            <span className="text-[11px] text-indigo-400 block mt-1">Office → Home route</span>
+            <span className="text-[11px] text-indigo-400 block mt-1">
+              {commuteTask?.context || 'Office → Home route'}
+            </span>
           </div>
 
           <div className="p-2.5 rounded-xl bg-neutral-800/70 border border-neutral-700/50">
             <span className="text-[10px] text-neutral-400 font-mono block">STEP 3 • ERRAND</span>
-            <span className="font-semibold text-neutral-200 block mt-0.5">🛒 FreshMart Groceries</span>
-            <span className="text-[11px] text-amber-400 block mt-1">19:00 PM (No extra trip)</span>
+            <span className="font-semibold text-neutral-200 block mt-0.5 truncate">
+              {commuteTask?.title || 'Personal Errand'}
+            </span>
+            <span className="text-[11px] text-amber-400 block mt-1">
+              {commuteTask?.startTime ? `${commuteTask.startTime} PM` : 'En route'}
+            </span>
           </div>
 
           <div className="p-2.5 rounded-xl bg-neutral-800/70 border border-neutral-700/50">
-            <span className="text-[10px] text-neutral-400 font-mono block">STEP 4 • EXPENSE</span>
-            <span className="font-semibold text-neutral-200 block mt-0.5">Auto-Record ₹</span>
-            <span className="text-[11px] text-emerald-400 block mt-1">Updates Monthly Spend</span>
+            <span className="text-[10px] text-neutral-400 font-mono block">STEP 4 • WALLET</span>
+            <span className="font-semibold text-neutral-200 block mt-0.5">Auto-Ledger Entry</span>
+            <span className="text-[11px] text-emerald-400 block mt-1">
+              {preferences.currencySymbol}{monthlySpending.toLocaleString('en-IN')} spend
+            </span>
           </div>
 
           <div className="p-2.5 rounded-xl bg-neutral-800/70 border border-neutral-700/50 col-span-2 md:col-span-1">
             <span className="text-[10px] text-neutral-400 font-mono block">STEP 5 • GOALS</span>
-            <span className="font-semibold text-neutral-200 block mt-0.5">Savings Recalculation</span>
-            <span className="text-[11px] text-violet-400 block mt-1">Keeps 41.6% Savings Rate</span>
+            <span className="font-semibold text-neutral-200 block mt-0.5">Net Worth Impact</span>
+            <span className="text-[11px] text-violet-400 block mt-1">
+              {savingsRate}% Savings Rate
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Main Dashboard Grid: Left Today Activity, Right Financial & Goals Overview */}
+      {/* 3. Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (2 cols wide on desktop): Chronological Today Activity */}
+        {/* Left Column: Scheduled Tasks */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <span>Today's Schedule & Tasks</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-normal">
-                  {todayTasks.length} items
+                  {sortedTasks.length} items
                 </span>
               </h2>
               <p className="text-xs text-neutral-400">
@@ -300,7 +357,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Timeline list */}
           <div className="space-y-2.5">
-            {todayTasks.map((task) => {
+            {sortedTasks.slice(0, 6).map((task) => {
               const isCompleted = task.status === 'completed';
               const isInProgress = task.status === 'in_progress';
 
@@ -317,7 +374,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   }`}
                 >
                   <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {/* Status Checkbox */}
                     <button
                       onClick={() => onToggleTaskStatus(task.id)}
                       className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center transition-all ${
@@ -332,17 +388,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <div className="space-y-1 flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* Time tag */}
                         <span className="text-xs font-mono font-medium text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded">
                           {task.startTime || task.dueTime || 'Anytime'}
                         </span>
 
-                        {/* Category badge */}
                         <span className="text-[10px] px-2 py-0.5 rounded-md font-medium bg-neutral-800 text-neutral-300 border border-neutral-700">
                           {task.category}
                         </span>
 
-                        {/* Priority */}
                         {task.priority === 'urgent' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold">
                             URGENT
@@ -354,7 +407,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
                         )}
 
-                        {/* Status tag */}
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                             isCompleted
@@ -382,7 +434,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </p>
                       )}
 
-                      {/* Location / Context tag */}
                       {(task.location || task.context) && (
                         <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 pt-0.5">
                           <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />
@@ -399,7 +450,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Status Toggle Quick Actions */}
                   <div className="flex items-center gap-1">
                     {!isCompleted && !isInProgress && (
                       <button
@@ -426,14 +476,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Financial Command & Savings Goals */}
+        {/* Right Column: Financial Balance Sheet & Goals */}
         <div className="space-y-4">
-          {/* Financial Snapshot */}
           <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-emerald-400" />
-                <span>Financial Command</span>
+                <span>Financial Balance Sheet</span>
               </h2>
               <button
                 onClick={() => onNavigateTab('finance')}
@@ -446,55 +495,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="space-y-2.5">
               <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
-                <span className="text-xs text-neutral-400">Total Available Balance</span>
-                <span className="text-base font-bold text-white font-mono">
-                  ₹{availableBalance.toLocaleString('en-IN')}
+                <span className="text-xs text-neutral-400">Net Worth</span>
+                <span className={`text-base font-bold font-mono ${netWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {preferences.currencySymbol}{netWorth.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
+                <span className="text-xs text-neutral-400">Total Liquid Cash</span>
+                <span className="text-sm font-bold text-white font-mono">
+                  {preferences.currencySymbol}{availableBalance.toLocaleString('en-IN')}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-neutral-400 block">Credit Card Outstanding</span>
-                  <span className="text-[10px] text-rose-400 font-semibold">Payment due in 5 days</span>
+                  <span className="text-xs text-neutral-400 block">Total Liabilities</span>
+                  <span className="text-[10px] text-rose-400 font-semibold">Cards & Debts</span>
                 </div>
                 <span className="text-sm font-bold text-rose-400 font-mono">
-                  ₹{totalCCOutstanding.toLocaleString('en-IN')}
+                  {preferences.currencySymbol}{totalLiabilities.toLocaleString('en-IN')}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
-                <span className="text-xs text-neutral-400">This Month's Spending</span>
-                <span className="text-sm font-bold text-neutral-200 font-mono">
-                  ₹{monthlySpending.toLocaleString('en-IN')}
-                </span>
-              </div>
+              {totalOwedToUser > 0 && (
+                <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
+                  <span className="text-xs text-neutral-400">Receivables (Owed to you)</span>
+                  <span className="text-sm font-bold text-cyan-400 font-mono">
+                    {preferences.currencySymbol}{totalOwedToUser.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
 
               <div className="p-3 rounded-xl bg-neutral-800/60 flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-neutral-400 block">Estimated Savings</span>
-                  <span className="text-[10px] text-emerald-400 font-semibold">Rate: {savingsRate}%</span>
+                  <span className="text-xs text-neutral-400 block">Savings Rate</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">{savingsRate}% of income</span>
                 </div>
                 <span className="text-sm font-bold text-emerald-400 font-mono">
-                  ₹{monthlySavings.toLocaleString('en-IN')}
+                  {preferences.currencySymbol}{Math.max(0, monthlySavings).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
 
-            {/* Quick Bill Action Banner */}
-            {upcomingBills.length > 0 && (
+            {/* Next Bill Action Banner */}
+            {nextBill && (
               <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-800/40">
                 <div className="flex items-center justify-between">
                   <div className="text-xs">
                     <span className="font-semibold text-amber-200 block">
-                      {upcomingBills[0].name}
+                      {nextBill.name}
                     </span>
                     <span className="text-neutral-400 text-[11px]">
-                      ₹{upcomingBills[0].amount.toLocaleString('en-IN')} • Due {upcomingBills[0].dueDate}
+                      {preferences.currencySymbol}{nextBill.amount.toLocaleString('en-IN')} • Due {nextBill.dueDate}
                     </span>
                   </div>
                   <button
-                    id={`btn-pay-bill-${upcomingBills[0].id}`}
-                    onClick={() => onPayBillModal(upcomingBills[0])}
+                    id={`btn-pay-bill-${nextBill.id}`}
+                    onClick={() => onPayBillModal(nextBill)}
                     className="px-2.5 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg transition-colors"
                   >
                     Pay
@@ -526,9 +584,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 return (
                   <div key={goal.id} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700/40 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-neutral-200">{goal.name}</span>
+                      <span className="font-semibold text-neutral-200">{goal.title}</span>
                       <span className="font-mono text-neutral-400">
-                        ₹{goal.currentAmount.toLocaleString('en-IN')} / ₹{goal.targetAmount.toLocaleString('en-IN')}
+                        {preferences.currencySymbol}{goal.currentAmount.toLocaleString('en-IN')} / {preferences.currencySymbol}{goal.targetAmount.toLocaleString('en-IN')}
                       </span>
                     </div>
                     <div className="w-full bg-neutral-700/50 h-2 rounded-full overflow-hidden">

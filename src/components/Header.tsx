@@ -25,6 +25,8 @@ interface HeaderProps {
   setDeviceMode?: (mode: 'desktop' | 'mobile') => void;
   onOpenSearch?: () => void;
   onOpenNotifications?: () => void;
+  onMarkAllAsRead?: () => void;
+  onMarkAsRead?: (id: string) => void;
   onOpenQuickAdd?: (initialType?: 'task' | 'expense' | 'bill') => void;
   onOpenVoiceAdd?: () => void;
   onOpenPlanDay?: () => void;
@@ -44,6 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   setDeviceMode,
   onOpenSearch,
   onOpenNotifications,
+  onMarkAllAsRead,
+  onMarkAsRead,
   onOpenQuickAdd,
   onOpenVoiceAdd,
   onOpenPlanDay,
@@ -54,14 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   bills = [],
 }) => {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-  const [localNotifications, setLocalNotifications] = useState<NotificationItem[]>(notifications || []);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (notifications && Array.isArray(notifications)) {
-      setLocalNotifications(notifications);
-    }
-  }, [notifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -73,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const safeNotifications = Array.isArray(localNotifications) ? localNotifications : [];
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
   const unreadCount = safeNotifications.filter((n) => !n?.read).length;
 
   const now = currentTime || new Date();
@@ -89,7 +86,11 @@ export const Header: React.FC<HeaderProps> = ({
   });
 
   const handleMarkAllAsRead = () => {
-    setLocalNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (onMarkAsRead) {
+      safeNotifications.forEach((n) => {
+        if (!n.read) onMarkAsRead(n.id);
+      });
+    }
   };
 
   const isMobile = deviceMode === 'mobile' || deviceMode === 'mobile-frame';
@@ -225,13 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative" ref={notifRef}>
             <button
               id="btn-header-notifications"
-              onClick={() => {
-                if (onOpenNotifications) {
-                  onOpenNotifications();
-                } else {
-                  setShowNotificationsDropdown(!showNotificationsDropdown);
-                }
-              }}
+              onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
               className="relative p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
               aria-label="Notifications"
             >
@@ -253,27 +248,45 @@ export const Header: React.FC<HeaderProps> = ({
                       </span>
                     )}
                   </div>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllAsRead}
-                      className="text-[11px] text-indigo-400 hover:underline"
-                    >
-                      Mark all read
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={() => {
+                          if (onMarkAllAsRead) onMarkAllAsRead();
+                        }}
+                        className="text-[11px] text-indigo-400 hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    {onOpenNotifications && (
+                      <button
+                        onClick={() => {
+                          setShowNotificationsDropdown(false);
+                          onOpenNotifications();
+                        }}
+                        className="text-[11px] text-neutral-400 hover:text-white"
+                      >
+                        View all
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {safeNotifications.length === 0 ? (
-                    <p className="text-neutral-500 text-center py-4">No notifications</p>
+                    <div className="text-center py-6 space-y-1">
+                      <p className="text-neutral-400 font-medium text-xs">No notifications</p>
+                      <p className="text-[11px] text-neutral-500">Upcoming tasks and bills will trigger alerts automatically.</p>
+                    </div>
                   ) : (
-                    safeNotifications.map((notif) => (
+                    safeNotifications.slice(0, 6).map((notif) => (
                       <div
                         key={notif.id}
                         className={`p-2.5 rounded-xl border transition-all ${
                           notif.read
                             ? 'bg-neutral-800/40 border-neutral-800 text-neutral-400'
-                            : 'bg-neutral-800/90 border-neutral-700 text-neutral-200'
+                            : 'bg-neutral-800/90 border-neutral-700 text-neutral-200 shadow-xs'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -287,28 +300,49 @@ export const Header: React.FC<HeaderProps> = ({
                         <p className="text-[11px] text-neutral-300 mt-1 leading-relaxed">
                           {notif.message}
                         </p>
-                        {notif.actionLabel && (
-                          <div className="mt-2 flex justify-end">
+                        <div className="mt-2 flex items-center justify-between">
+                          {!notif.read && onMarkAsRead && (
+                            <button
+                              onClick={() => onMarkAsRead(notif.id)}
+                              className="text-[10px] text-neutral-400 hover:text-emerald-400"
+                            >
+                              Mark read
+                            </button>
+                          )}
+                          {notif.actionLabel && (
                             <button
                               onClick={() => {
                                 setShowNotificationsDropdown(false);
+                                if (onMarkAsRead) onMarkAsRead(notif.id);
                                 if (notif.type === 'bill' || notif.type === 'credit_card') {
                                   setActiveTab?.('bills');
                                 } else {
                                   setActiveTab?.('tasks');
                                 }
                               }}
-                              className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                              className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 ml-auto"
                             >
                               <span>{notif.actionLabel}</span>
                               <span>→</span>
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
+
+                {safeNotifications.length > 0 && onOpenNotifications && (
+                  <button
+                    onClick={() => {
+                      setShowNotificationsDropdown(false);
+                      onOpenNotifications();
+                    }}
+                    className="w-full py-1.5 text-center text-[11px] font-medium text-neutral-400 hover:text-white bg-neutral-800/60 hover:bg-neutral-800 rounded-lg transition-all"
+                  >
+                    Open Notification Center →
+                  </button>
+                )}
               </div>
             )}
           </div>

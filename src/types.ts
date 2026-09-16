@@ -1,6 +1,6 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled' | 'deferred';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled' | 'deferred' | 'scheduled';
 
 export type TaskCategory = 
   | 'Work'
@@ -42,16 +42,37 @@ export interface Task {
   completedAt?: string;
 }
 
+export type AccountType = 
+  | 'Bank Account'
+  | 'Salary'
+  | 'Savings'
+  | 'Checking'
+  | 'Cash'
+  | 'ATM Cash'
+  | 'Wallet'
+  | 'Investment'
+  | 'Fixed Deposit'
+  | 'Other Asset';
+
 export interface BankAccount {
   id: string;
   name: string;
-  bank: string;
-  type: 'Salary' | 'Savings' | 'Checking' | 'Cash' | 'Investment';
+  bank?: string;
+  institution?: string;
+  type: AccountType;
   currentBalance: number;
   availableBalance: number;
-  accountNumberMasked: string;
+  openingBalance?: number;
+  accountNumberMasked?: string;
+  currency?: string;
+  color?: string;
+  isPrimary?: boolean;
+  status?: 'active' | 'archived';
   notes?: string;
+  updatedAt?: string;
 }
+
+export type FinancialAccount = BankAccount;
 
 export interface CreditCard {
   id: string;
@@ -63,10 +84,79 @@ export interface CreditCard {
   statementDate: number; // Day of month, e.g. 15
   paymentDueDate: string; // YYYY-MM-DD
   minDue: number;
+  minimumDue?: number;
   totalDue: number;
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
+  lastFourDigits?: string;
+  billingCycleDate?: number;
   apr?: number;
+  color?: string;
+  notes?: string;
+}
+
+// Debt domain model: Supports both "Money I Owe" (Liabilities) and "Money Owed To Me" (Assets)
+export type DebtDirection = 'owe' | 'owed_to_me';
+export type DebtCategory = 
+  | 'Personal Debt' 
+  | 'Loan' 
+  | 'Credit Card' 
+  | 'EMI' 
+  | 'Borrowed Money' 
+  | 'Lent Money';
+
+export interface Debt {
+  id: string;
+  personOrEntity: string;
+  direction: DebtDirection; // 'owe' (Liability / Money I owe) vs 'owed_to_me' (Asset / Money owed to me)
+  category: DebtCategory;
+  totalAmount: number;
+  outstandingAmount: number;
+  dueDate?: string;
+  interestRate?: number;
+  notes?: string;
+  status: 'active' | 'settled';
+  createdAt: string;
+  settledAt?: string;
+  updatedAt?: string;
+}
+
+// Unified Ledger Transaction Model
+export type TransactionType = 
+  | 'income'
+  | 'expense'
+  | 'transfer'
+  | 'debt_borrowed'
+  | 'debt_repayment'
+  | 'loan_received'
+  | 'loan_repayment'
+  | 'credit_card_purchase'
+  | 'credit_card_payment'
+  | 'bill_payment'
+  | 'investment'
+  | 'withdrawal'
+  | 'deposit';
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  title: string;
+  amount: number;
+  category: string;
+  date: string; // YYYY-MM-DD
+  time?: string;
+  sourceAccountId?: string;
+  destinationAccountId?: string;
+  paymentMethod?: string;
+  relatedDebtId?: string;
+  relatedBillId?: string;
+  relatedCreditCardId?: string;
+  debtId?: string;
+  billId?: string;
+  cardId?: string;
+  isEssential?: boolean;
+  notes?: string;
+  createdAt?: string;
 }
 
 export type BillCategory = 
@@ -79,9 +169,12 @@ export type BillCategory =
   | 'Credit Card'
   | 'Loan'
   | 'Water'
+  | 'Utilities'
+  | 'Education'
   | 'Other';
 
-export type BillStatus = 'upcoming' | 'due_today' | 'overdue' | 'paid';
+export type BillStatus = 'upcoming' | 'due_soon' | 'due_today' | 'overdue' | 'paid' | 'skipped' | 'cancelled';
+export type BillFrequency = 'one-time' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly';
 
 export interface Bill {
   id: string;
@@ -89,11 +182,12 @@ export interface Bill {
   category: BillCategory;
   amount: number;
   dueDate: string; // YYYY-MM-DD
-  frequency: 'monthly' | 'weekly' | 'quarterly' | 'yearly' | 'one-time';
+  frequency: BillFrequency;
   status: BillStatus;
   autoPay: boolean;
   reminderDaysBefore: number;
   accountId?: string;
+  paymentAccountId?: string;
   notes?: string;
   paidAt?: string;
   paymentTransactionId?: string;
@@ -106,6 +200,7 @@ export type ExpenseCategory =
   | 'Fuel'
   | 'Shopping'
   | 'Bills'
+  | 'Utilities'
   | 'Entertainment'
   | 'Health'
   | 'Education'
@@ -122,7 +217,8 @@ export interface Expense {
   category: ExpenseCategory;
   date: string; // YYYY-MM-DD
   time?: string;
-  paymentMethod: string; // "HDFC Salary", "Credit Card", "Cash"
+  paymentMethod: string; // Dynamic account name or ID
+  accountId?: string;
   isEssential: boolean;
   notes?: string;
   relatedTaskId?: string;
@@ -249,8 +345,10 @@ export interface WeeklyPlanResponse {
   financialOutlook: { upcomingBillsTotal: number; advice: string };
 }
 
+export type ExtractedItemType = 'task' | 'expense' | 'income' | 'bill' | 'debt' | 'transfer' | 'note';
+
 export interface ExtractedTaskData {
-  type: 'task' | 'expense' | 'bill';
+  type: ExtractedItemType;
   title: string;
   category: string;
   amount?: number;
@@ -265,6 +363,13 @@ export interface ExtractedTaskData {
   recurring?: boolean;
   recurrencePattern?: string;
   isEssential?: boolean;
+  // Financial & Debt specific fields
+  person?: string; // For debts or meetings
+  debtDirection?: DebtDirection; // 'owe' or 'owed_to_me'
+  sourceAccount?: string; // For transfers / expenses
+  destinationAccount?: string; // For transfers / incomes
+  frequency?: BillFrequency; // For recurring bills
+  notes?: string;
 }
 
 export interface AIChatMessage {

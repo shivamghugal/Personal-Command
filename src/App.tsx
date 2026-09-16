@@ -52,6 +52,8 @@ import {
   initialNotes,
   initialNotifications,
   initialPreferences,
+  initialDebts,
+  initialTransactions,
 } from './data/initialData';
 import { 
   Task, 
@@ -65,7 +67,9 @@ import {
   Note, 
   NotificationItem, 
   UserPreferences, 
-  TaskStatus 
+  TaskStatus,
+  Debt,
+  Transaction
 } from './types';
 import {
   loadCollection,
@@ -84,13 +88,15 @@ export default function App() {
   const [deviceMode, setDeviceMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // App Data State (default starts empty / fresh or loaded from Firestore)
+  // App Data State (loaded from Firestore with persistence)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [lifeEvents, setLifeEvents] = useState<LifeEvent[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -122,6 +128,8 @@ export default function App() {
           dbBills,
           dbExpenses,
           dbGoals,
+          dbDebts,
+          dbTransactions,
           dbEvents,
           dbLife,
           dbNotes,
@@ -134,6 +142,8 @@ export default function App() {
           loadCollection<Bill>('bills'),
           loadCollection<Expense>('expenses'),
           loadCollection<SavingsGoal>('savingsGoals'),
+          loadCollection<Debt>('debts'),
+          loadCollection<Transaction>('transactions'),
           loadCollection<CalendarEvent>('calendarEvents'),
           loadCollection<LifeEvent>('lifeEvents'),
           loadCollection<Note>('notes'),
@@ -142,18 +152,19 @@ export default function App() {
         ]);
 
         if (isMounted) {
-          // If Firestore is completely fresh and unseeded, we start with a clean slate!
-          // No sample data forced unless user requests it.
           setTasks(dbTasks);
           setBankAccounts(dbAccounts);
           setCreditCards(dbCards);
           setBills(dbBills);
           setExpenses(dbExpenses);
           setSavingsGoals(dbGoals);
+          setDebts(dbDebts);
+          setTransactions(dbTransactions);
           setCalendarEvents(dbEvents);
           setLifeEvents(dbLife);
           setNotes(dbNotes);
           setNotifications(dbNotifications);
+
           if (dbPref) {
             setPreferences(dbPref);
           } else {
@@ -216,7 +227,6 @@ export default function App() {
   const handleAddTask = async (newTask: Task) => {
     setTasks((prev) => [newTask, ...prev]);
 
-    // Append a connected life event to timeline
     const newLifeEvent: LifeEvent = {
       id: `life-${Date.now()}`,
       title: `Task Scheduled: ${newTask.title}`,
@@ -257,26 +267,37 @@ export default function App() {
   };
 
   // Handlers for Finances
-  const handleAddExpense = async (newExp: Expense) => {
+  const handleAddExpense = async (newExp: Expense, sourceAccountId?: string) => {
     setExpenses((prev) => [newExp, ...prev]);
 
-    // Update account balance
-    let updatedAccs = bankAccounts.map((acc) => {
-      if (newExp.paymentMethod.includes(acc.bank) || newExp.paymentMethod.includes('UPI')) {
-        const updated = {
-          ...acc,
-          currentBalance: Math.max(0, acc.currentBalance - newExp.amount),
-          availableBalance: Math.max(0, acc.availableBalance - newExp.amount),
-        };
-        saveDocument('bankAccounts', updated).catch(console.error);
-        return updated;
-      }
-      return acc;
-    });
-    setBankAccounts(updatedAccs);
+    // Update account balance if bank account selected or matched
+    let targetAccId = sourceAccountId;
+    if (!targetAccId && bankAccounts.length > 0) {
+      const matched = bankAccounts.find(
+        (a) => newExp.paymentMethod.includes(a.bank) || newExp.paymentMethod.includes(a.name)
+      );
+      targetAccId = matched?.id || bankAccounts[0]?.id;
+    }
+
+    if (targetAccId) {
+      setBankAccounts((prev) =>
+        prev.map((acc) => {
+          if (acc.id === targetAccId) {
+            const updated = {
+              ...acc,
+              currentBalance: Math.max(0, acc.currentBalance - newExp.amount),
+              availableBalance: Math.max(0, (acc.availableBalance ?? acc.currentBalance) - newExp.amount),
+            };
+            saveDocument('bankAccounts', updated).catch(console.error);
+            return updated;
+          }
+          return acc;
+        })
+      );
+    }
 
     // If paid by credit card, update card outstanding
-    if (newExp.paymentMethod.toLowerCase().includes('regalia') || newExp.paymentMethod.toLowerCase().includes('card')) {
+    if (newExp.paymentMethod.toLowerCase().includes('card') || newExp.paymentMethod.toLowerCase().includes('regalia')) {
       setCreditCards((prev) =>
         prev.map((c) => {
           const updated = {
@@ -289,6 +310,20 @@ export default function App() {
         })
       );
     }
+
+    // Ledger Transaction Record
+    const newTx: Transaction = {
+      id: `tx-exp-${Date.now()}`,
+      title: newExp.title,
+      amount: newExp.amount,
+      type: 'expense',
+      category: newExp.category,
+      sourceAccountId: targetAccId,
+      date: newExp.date || new Date().toISOString().split('T')[0],
+      time: newExp.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: newExp.paymentMethod,
+    };
+    setTransactions((prev) => [newTx, ...prev]);
 
     // Append life event
     const newLifeEvent: LifeEvent = {
@@ -307,6 +342,7 @@ export default function App() {
 
     try {
       await saveDocument('expenses', newExp);
+      await saveDocument('transactions', newTx);
       await saveDocument('lifeEvents', newLifeEvent);
     } catch (e) {
       console.error(e);
@@ -337,7 +373,7 @@ export default function App() {
           const updated = {
             ...a,
             currentBalance: Math.max(0, a.currentBalance - amount),
-            availableBalance: Math.max(0, a.availableBalance - amount),
+            availableBalance: Math.max(0, (a.availableBalance ?? a.currentBalance) - amount),
           };
           saveDocument('bankAccounts', updated).catch(console.error);
           return updated;
@@ -346,7 +382,7 @@ export default function App() {
       })
     );
 
-    // If credit card bill
+    // If credit card bill, clear credit card balance
     if (bill && bill.category === 'Credit Card') {
       setCreditCards((prev) =>
         prev.map((c) => {
@@ -360,6 +396,21 @@ export default function App() {
         })
       );
     }
+
+    // Ledger Transaction Record
+    const billTx: Transaction = {
+      id: `tx-bill-${Date.now()}`,
+      title: `Bill Payment: ${bill?.name || 'Bill'}`,
+      amount,
+      type: 'bill_payment',
+      category: bill?.category || 'Bills',
+      sourceAccountId: accountId,
+      billId,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: 'Bank Transfer / Netbanking',
+    };
+    setTransactions((prev) => [billTx, ...prev]);
 
     // Add expense record
     const billExpense: Expense = {
@@ -378,32 +429,67 @@ export default function App() {
     const newLifeEvent: LifeEvent = {
       id: `life-bill-${Date.now()}`,
       title: `Bill Paid: ${bill?.name || 'Bill'}`,
-      description: `${preferences.currencySymbol}${amount.toLocaleString('en-IN')} paid successfully. Account balance cleared.`,
+      description: `${preferences.currencySymbol}${amount.toLocaleString('en-IN')} paid successfully. Account balance updated.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type: 'bill',
       amount,
       metadata: {
         category: 'Finance',
-        savingsImpact: 'Cleared liabilities',
+        savingsImpact: 'Cleared liability',
       },
     };
     setLifeEvents((prev) => [newLifeEvent, ...prev]);
 
     try {
       await saveDocument('expenses', billExpense);
+      await saveDocument('transactions', billTx);
       await saveDocument('lifeEvents', newLifeEvent);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleAddSavingsFund = async (goalId: string, amount: number) => {
+  const handleAddSavingsFund = async (goalId: string, amount: number, sourceAccountId?: string) => {
     const goal = savingsGoals.find((g) => g.id === goalId);
     if (!goal) return;
     const updatedGoal = { ...goal, currentAmount: goal.currentAmount + amount };
     setSavingsGoals((prev) =>
       prev.map((g) => (g.id === goalId ? updatedGoal : g))
     );
+
+    // If source account selected, deduct from bank account
+    if (sourceAccountId) {
+      setBankAccounts((prev) =>
+        prev.map((a) => {
+          if (a.id === sourceAccountId) {
+            const updated = {
+              ...a,
+              currentBalance: Math.max(0, a.currentBalance - amount),
+              availableBalance: Math.max(0, (a.availableBalance ?? a.currentBalance) - amount),
+            };
+            saveDocument('bankAccounts', updated).catch(console.error);
+            return updated;
+          }
+          return a;
+        })
+      );
+
+      // Add transfer transaction
+      const tx: Transaction = {
+        id: `tx-goal-${Date.now()}`,
+        title: `Savings Allocation: ${goal.title}`,
+        amount,
+        type: 'transfer',
+        category: 'Investment',
+        sourceAccountId,
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        notes: `Allocated to ${goal.title}`,
+      };
+      setTransactions((prev) => [tx, ...prev]);
+      saveDocument('transactions', tx).catch(console.error);
+    }
+
     try {
       await saveDocument('savingsGoals', updatedGoal);
     } catch (e) {
@@ -415,6 +501,141 @@ export default function App() {
     setBankAccounts((prev) => [...prev, acc]);
     try {
       await saveDocument('bankAccounts', acc);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddCreditCard = async (card: CreditCard) => {
+    setCreditCards((prev) => [...prev, card]);
+    try {
+      await saveDocument('creditCards', card);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddBill = async (newBill: Bill) => {
+    setBills((prev) => [newBill, ...prev]);
+    try {
+      await saveDocument('bills', newBill);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddDebt = async (newDebt: Debt) => {
+    setDebts((prev) => [newDebt, ...prev]);
+    try {
+      await saveDocument('debts', newDebt);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSettleDebt = async (debtId: string, accountId: string, amount: number) => {
+    const debt = debts.find((d) => d.id === debtId);
+    if (!debt) return;
+
+    const remaining = Math.max(0, (debt.outstandingAmount || debt.totalAmount) - amount);
+    const updatedDebt: Debt = {
+      ...debt,
+      outstandingAmount: remaining,
+      status: remaining === 0 ? 'settled' : 'active',
+      settledAt: remaining === 0 ? new Date().toISOString() : undefined,
+    };
+
+    setDebts((prev) => prev.map((d) => (d.id === debtId ? updatedDebt : d)));
+
+    // Adjust bank account balance
+    setBankAccounts((prev) =>
+      prev.map((acc) => {
+        if (acc.id === accountId) {
+          const delta = debt.direction === 'owe' ? -amount : amount;
+          const newBal = Math.max(0, acc.currentBalance + delta);
+          const updated = {
+            ...acc,
+            currentBalance: newBal,
+            availableBalance: newBal,
+          };
+          saveDocument('bankAccounts', updated).catch(console.error);
+          return updated;
+        }
+        return acc;
+      })
+    );
+
+    // Record ledger transaction
+    const tx: Transaction = {
+      id: `tx-debt-${Date.now()}`,
+      title: debt.direction === 'owe' ? `Repaid Debt to ${debt.personOrEntity}` : `Collected Debt from ${debt.personOrEntity}`,
+      amount,
+      type: 'debt_repayment',
+      category: 'Transfer',
+      sourceAccountId: debt.direction === 'owe' ? accountId : undefined,
+      destinationAccountId: debt.direction === 'owed_to_me' ? accountId : undefined,
+      debtId,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: 'Direct Bank Settlement',
+    };
+    setTransactions((prev) => [tx, ...prev]);
+
+    try {
+      await saveDocument('debts', updatedDebt);
+      await saveDocument('transactions', tx);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleTransferFunds = async (fromAccountId: string, toAccountId: string, amount: number) => {
+    setBankAccounts((prev) =>
+      prev.map((acc) => {
+        if (acc.id === fromAccountId) {
+          const newBal = Math.max(0, acc.currentBalance - amount);
+          const updated = { ...acc, currentBalance: newBal, availableBalance: newBal };
+          saveDocument('bankAccounts', updated).catch(console.error);
+          return updated;
+        }
+        if (acc.id === toAccountId) {
+          const newBal = acc.currentBalance + amount;
+          const updated = { ...acc, currentBalance: newBal, availableBalance: newBal };
+          saveDocument('bankAccounts', updated).catch(console.error);
+          return updated;
+        }
+        return acc;
+      })
+    );
+
+    const fromAcc = bankAccounts.find((a) => a.id === fromAccountId);
+    const toAcc = bankAccounts.find((a) => a.id === toAccountId);
+
+    const tx: Transaction = {
+      id: `tx-trf-${Date.now()}`,
+      title: `Transfer: ${fromAcc?.name || 'Account'} → ${toAcc?.name || 'Account'}`,
+      amount,
+      type: 'transfer',
+      category: 'Transfer',
+      sourceAccountId: fromAccountId,
+      destinationAccountId: toAccountId,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: 'Account-to-Account Transfer',
+    };
+    setTransactions((prev) => [tx, ...prev]);
+
+    try {
+      await saveDocument('transactions', tx);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddTransaction = async (tx: Transaction) => {
+    setTransactions((prev) => [tx, ...prev]);
+    try {
+      await saveDocument('transactions', tx);
     } catch (e) {
       console.error(e);
     }
@@ -474,6 +695,8 @@ export default function App() {
         dbBills,
         dbExpenses,
         dbGoals,
+        dbDebts,
+        dbTransactions,
         dbEvents,
         dbLife,
         dbNotes,
@@ -485,6 +708,8 @@ export default function App() {
         loadCollection<Bill>('bills'),
         loadCollection<Expense>('expenses'),
         loadCollection<SavingsGoal>('savingsGoals'),
+        loadCollection<Debt>('debts'),
+        loadCollection<Transaction>('transactions'),
         loadCollection<CalendarEvent>('calendarEvents'),
         loadCollection<LifeEvent>('lifeEvents'),
         loadCollection<Note>('notes'),
@@ -497,6 +722,8 @@ export default function App() {
       setBills(dbBills);
       setExpenses(dbExpenses);
       setSavingsGoals(dbGoals);
+      setDebts(dbDebts);
+      setTransactions(dbTransactions);
       setCalendarEvents(dbEvents);
       setLifeEvents(dbLife);
       setNotes(dbNotes);
@@ -522,6 +749,8 @@ export default function App() {
     setBills([]);
     setExpenses([]);
     setSavingsGoals([]);
+    setDebts([]);
+    setTransactions([]);
     setCalendarEvents([]);
     setLifeEvents([]);
     setNotes([]);
@@ -543,6 +772,8 @@ export default function App() {
     setBills(initialBills);
     setExpenses(initialExpenses);
     setSavingsGoals(initialSavingsGoals);
+    setDebts(initialDebts);
+    setTransactions(initialTransactions);
     setCalendarEvents(initialCalendarEvents);
     setLifeEvents(initialLifeEvents);
     setNotes(initialNotes);
@@ -570,6 +801,8 @@ export default function App() {
     updatedTasks.forEach((t) => saveDocument('tasks', t).catch(console.error));
   };
 
+  const pendingTasksCount = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').length;
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Primary Global Top Header */}
@@ -586,7 +819,7 @@ export default function App() {
         onOpenQuickAdd={(type) => {
           if (type === 'task') setActiveTab('tasks');
           else if (type === 'expense') setActiveTab('finance');
-          else if (type === 'bill') setActiveTab('bills');
+          else if (type === 'bill') setActiveTab('finance');
         }}
         onOpenSearch={() => setActiveTab('tasks')}
         onOpenNotifications={() => setActiveTab('timeline')}
@@ -595,7 +828,7 @@ export default function App() {
         bills={bills}
       />
 
-      {/* Main Container: Supports standard desktop full-width OR interactive mobile frame simulation */}
+      {/* Main Container */}
       <div
         className={`flex-1 flex transition-all ${
           deviceMode === 'mobile'
@@ -603,7 +836,7 @@ export default function App() {
             : 'w-full'
         }`}
       >
-        {/* If Mobile Mode is active, wrap in a simulated mobile device frame */}
+        {/* If Mobile Mode is active, wrap in simulated device frame */}
         <div
           className={`flex-1 flex flex-col transition-all ${
             deviceMode === 'mobile'
@@ -611,11 +844,10 @@ export default function App() {
               : 'w-full'
           }`}
         >
-          {/* Simulated Mobile Status Bar (Visible only when in Mobile View Mode) */}
+          {/* Simulated Mobile Status Bar */}
           {deviceMode === 'mobile' && (
             <div className="h-9 bg-neutral-900/90 border-b border-neutral-800 px-6 flex items-center justify-between text-[11px] font-mono text-neutral-400 select-none z-30 shrink-0">
               <span className="font-semibold text-white">09:41</span>
-              {/* Dynamic Island / Notch indicator */}
               <div className="w-20 h-4 bg-neutral-950 rounded-full border border-neutral-800 flex items-center justify-center">
                 <span className="w-2 h-2 rounded-full bg-indigo-500/80"></span>
               </div>
@@ -664,6 +896,7 @@ export default function App() {
                   creditCards={creditCards}
                   expenses={expenses}
                   savingsGoals={savingsGoals}
+                  debts={debts}
                   onToggleTaskStatus={handleToggleTaskStatus}
                   onUpdateTaskStatus={handleUpdateTaskStatus}
                   onOpenPlanDay={() => setIsPlanDayModalOpen(true)}
@@ -673,8 +906,8 @@ export default function App() {
                   }}
                   onQuickAdd={(type) => {
                     if (type === 'task') setActiveTab('tasks');
-                    else if (type === 'expense') setActiveTab('expenses');
-                    else setActiveTab('bills');
+                    else if (type === 'expense') setActiveTab('finance');
+                    else setActiveTab('finance');
                   }}
                 />
               )}
@@ -709,10 +942,21 @@ export default function App() {
                   bills={bills}
                   expenses={expenses}
                   savingsGoals={savingsGoals}
+                  debts={debts}
+                  transactions={transactions}
+                  initialSubTab={
+                    activeTab === 'expenses' ? 'expenses' : activeTab === 'bills' ? 'bills' : activeTab === 'goals' ? 'goals' : 'overview'
+                  }
                   onAddExpense={handleAddExpense}
                   onPayBill={handlePayBill}
                   onAddSavingsFund={handleAddSavingsFund}
                   onAddBankAccount={handleAddBankAccount}
+                  onAddCreditCard={handleAddCreditCard}
+                  onAddBill={handleAddBill}
+                  onAddDebt={handleAddDebt}
+                  onSettleDebt={handleSettleDebt}
+                  onAddTransaction={handleAddTransaction}
+                  onTransferFunds={handleTransferFunds}
                 />
               )}
 
@@ -758,15 +1002,15 @@ export default function App() {
             </main>
           </div>
 
-          {/* Bottom Navigation for Mobile (shown when in mobile simulated mode OR on actual small screen width) */}
-          <div className={deviceMode === 'mobile' ? 'block' : 'lg:hidden'}>
-            <MobileBottomNav
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              onOpenVoiceAdd={() => setIsVoiceAddModalOpen(true)}
-              onOpenQuickAdd={() => setActiveTab('tasks')}
-            />
-          </div>
+          {/* Bottom Navigation for Mobile */}
+          <MobileBottomNav
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onOpenVoiceAdd={() => setIsVoiceAddModalOpen(true)}
+            onOpenQuickAdd={() => setActiveTab('tasks')}
+            pendingTasksCount={pendingTasksCount}
+            isSimulatedMobile={deviceMode === 'mobile'}
+          />
         </div>
       </div>
 
@@ -789,15 +1033,11 @@ export default function App() {
           onClose={() => setIsVoiceAddModalOpen(false)}
           onAddTask={handleAddTask}
           onAddExpense={handleAddExpense}
-          onAddBill={async (newBill) => {
-            setBills((prev) => [newBill, ...prev]);
-            try {
-              await saveDocument('bills', newBill);
-            } catch (e) {
-              console.error(e);
-            }
-          }}
+          onAddBill={handleAddBill}
+          onAddDebt={handleAddDebt}
+          onTransferFunds={handleTransferFunds}
           preferences={preferences}
+          bankAccounts={bankAccounts}
         />
       )}
     </div>

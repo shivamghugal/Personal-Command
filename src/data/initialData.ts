@@ -10,6 +10,8 @@ import {
   Task,
   UserPreferences,
   LifeEvent,
+  Debt,
+  Transaction,
 } from '../types';
 
 export const initialPreferences: UserPreferences = {
@@ -655,6 +657,70 @@ export const initialLifeEvents: LifeEvent[] = [
     metadata: {
       category: 'Finance',
     },
+  },
+];
+
+export const initialDebts: Debt[] = [
+  {
+    id: 'debt-1',
+    personOrEntity: 'Rahul Sharma',
+    direction: 'owe',
+    category: 'Borrowed Money',
+    totalAmount: 15000,
+    outstandingAmount: 15000,
+    dueDate: '2026-10-15',
+    status: 'active',
+    notes: 'Laptop accessories split payment, to repay next month',
+    createdAt: '2026-09-01T12:00:00Z',
+  },
+  {
+    id: 'debt-2',
+    personOrEntity: 'Vikram Mehta',
+    direction: 'owed_to_me',
+    category: 'Lent Money',
+    totalAmount: 8500,
+    outstandingAmount: 8500,
+    dueDate: '2026-09-25',
+    status: 'active',
+    notes: 'Group vacation flight tickets booking reimbursement',
+    createdAt: '2026-09-05T10:00:00Z',
+  },
+];
+
+export const initialTransactions: Transaction[] = [
+  {
+    id: 'tx-1',
+    title: 'Grocery Supplies at FreshMart',
+    amount: 450,
+    type: 'expense',
+    category: 'Groceries',
+    sourceAccountId: 'acc-1',
+    date: '2026-09-15',
+    time: '19:15',
+    paymentMethod: 'UPI / HDFC',
+  },
+  {
+    id: 'tx-2',
+    title: 'ATM Cash Withdrawal',
+    amount: 5000,
+    type: 'transfer',
+    category: 'Cash',
+    sourceAccountId: 'acc-1',
+    destinationAccountId: 'acc-3',
+    date: '2026-09-12',
+    time: '14:30',
+    paymentMethod: 'ATM Transfer',
+  },
+  {
+    id: 'tx-3',
+    title: 'Monthly Direct Salary Credit',
+    amount: 95000,
+    type: 'income',
+    category: 'Salary',
+    destinationAccountId: 'acc-1',
+    date: '2026-09-01',
+    time: '09:00',
+    paymentMethod: 'Direct Deposit',
   },
 ];
 

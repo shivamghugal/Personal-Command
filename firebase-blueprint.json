@@ -105,6 +105,38 @@
         "tags": { "type": "array", "description": "List of tags" },
         "isPinned": { "type": "boolean", "description": "Pin status" }
       }
+    },
+    "debts": {
+      "title": "Debts & Liabilities",
+      "description": "Personal debts, loans, borrowed money, and money owed to user",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "personOrEntity": { "type": "string", "description": "Person or counterparty name" },
+        "direction": { "type": "string", "description": "owe (liability) or owed_to_me (asset)" },
+        "category": { "type": "string", "description": "Personal Debt, Loan, Credit Card, EMI, Borrowed Money, Lent Money" },
+        "totalAmount": { "type": "number", "description": "Total principal amount" },
+        "outstandingAmount": { "type": "number", "description": "Remaining balance" },
+        "dueDate": { "type": "string", "description": "Due date YYYY-MM-DD" },
+        "status": { "type": "string", "description": "active or settled" },
+        "notes": { "type": "string", "description": "Notes" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "transactions": {
+      "title": "Ledger Transactions",
+      "description": "Unified financial transactions including transfers, incomes, expenses, debt repayments",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "type": { "type": "string", "description": "income, expense, transfer, debt_borrowed, debt_repayment, bill_payment, credit_card_payment" },
+        "title": { "type": "string", "description": "Transaction title" },
+        "amount": { "type": "number", "description": "Amount in INR" },
+        "category": { "type": "string", "description": "Transaction category" },
+        "date": { "type": "string", "description": "Date YYYY-MM-DD" },
+        "sourceAccountId": { "type": "string", "description": "Source account ID" },
+        "destinationAccountId": { "type": "string", "description": "Destination account ID" },
+        "paymentMethod": { "type": "string", "description": "Payment method label" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      }
     }
   }
 }

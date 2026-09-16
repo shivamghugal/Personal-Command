@@ -33,7 +33,7 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// 1. Natural Language & Voice Task/Expense/Bill Extractor
+// 1. Natural Language & Voice Task/Expense/Income/Bill/Debt/Transfer Extractor
 app.post('/api/ai/parse-task', async (req: Request, res: Response) => {
   try {
     const { text, userPreferences } = req.body;
@@ -41,37 +41,43 @@ app.post('/api/ai/parse-task', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Text prompt is required' });
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
     const ai = getAIClient();
     if (ai) {
-      const prompt = `You are a smart Personal Command Center assistant. Parse the following natural language voice/text input into structured task, expense, or bill data.
+      const prompt = `You are an elite Personal Command Center assistant. Parse the natural language voice/text input into structured operational data.
 Input: "${text}"
-Current Date Context: September 15, 2026 (Tuesday).
-User City/Currency: ${userPreferences?.currencyCode || 'INR'} (${userPreferences?.currencySymbol || '₹'}).
-Home: ${userPreferences?.homeLocation || 'Greenwood Residency, Sector 45'}
-Office: ${userPreferences?.officeLocation || 'Cyber City Tech Hub, Tower B'}
+Current Date: ${todayStr}
+Currency: ${userPreferences?.currencyCode || 'INR'} (${userPreferences?.currencySymbol || '₹'})
+User Accounts: ${JSON.stringify(userPreferences?.accounts || ['HDFC Salary', 'SBI Savings', 'ATM Cash', 'Wallet Cash'])}
 
-Analyze whether the user is talking about:
-1. A Task (e.g., "Buy groceries while coming back from office", "Review database changes tomorrow morning")
-2. An Expense (e.g., "I spent 450 rupees on groceries", "Paid 120 for lunch")
-3. A Bill / Credit Card payment (e.g., "Remind me to pay electricity bill before Friday", "Pay credit card bill of 12000 rupees on the 20th")
+Determine whether the user is expressing:
+1. Task (e.g. "Tomorrow at 10 AM call the bank", "Review architecture proposal")
+2. Expense (e.g. "I spent 450 rupees on groceries", "Coffee ₹150 from ATM cash")
+3. Income (e.g. "Received salary 95000 in HDFC", "Freelance client paid 20000")
+4. Bill (e.g. "Electricity bill of 2400 is due on September 25", "Rent 25000 due on 1st")
+5. Debt / Liability / Receivable (e.g. "I borrowed 20000 from Rahul", "Amit borrowed 5000 from me", "Lent 3000 to Priya")
+6. Transfer (e.g. "Transferred 10000 from HDFC to ATM Cash", "Moved 5000 to savings")
 
-Respond with pure valid JSON only (no markdown, no backticks, no extra text):
+Respond strictly with pure valid JSON (no markdown formatting, no backticks):
 {
-  "type": "task" | "expense" | "bill",
-  "title": "Clean concise title",
-  "category": "Work" | "Personal" | "Finance" | "Health" | "Shopping" | "Family" | "Learning" | "Travel" | "Food" | "Groceries" | "Bills" | "Other",
-  "amount": number (if expense or bill, otherwise undefined),
+  "type": "task" | "expense" | "income" | "bill" | "debt" | "transfer" | "note",
+  "title": "Clean, descriptive title",
+  "category": string (e.g., "Work", "Personal", "Groceries", "Food", "Bills", "Electricity", "Borrowed Money", "Lent Money", "Salary", "Transport", "Shopping"),
+  "amount": number (for expense, income, bill, debt, or transfer),
   "priority": "low" | "medium" | "high" | "urgent",
   "dueDate": "YYYY-MM-DD",
   "dueTime": "HH:mm" (optional),
   "startTime": "HH:mm" (optional),
-  "context": "Context such as Office -> Home Commute or Office" (optional),
-  "location": "Suggested location or store name" (optional),
+  "person": string (counterparty for debts, loans, or meetings, e.g. "Rahul", "Amit"),
+  "debtDirection": "owe" | "owed_to_me" (if debt: "owe" if user borrowed/liable, "owed_to_me" if user lent/receivable),
+  "sourceAccount": string (for transfers or expenses, e.g. "HDFC Salary", "ATM Cash"),
+  "destinationAccount": string (for transfers or incomes, e.g. "ATM Cash", "SBI Savings"),
+  "frequency": "one-time" | "monthly" | "weekly" | "yearly" (for bills),
+  "location": string (optional),
   "locationBased": boolean,
-  "suggestedTime": "human readable time trigger" (optional),
-  "recurring": boolean,
-  "recurrencePattern": "daily" | "weekly" | "monthly" (optional),
-  "isEssential": boolean (for expenses, true if groceries, utility, medical, transport; false if dining out, luxury)
+  "context": string (e.g., "Commute Route", "Office", "Home"),
+  "isEssential": boolean (for expenses: true for groceries, bills, medical, transport; false for dining/luxury),
+  "notes": string (optional)
 }`;
 
       const response = await ai.models.generateContent({
@@ -88,41 +94,96 @@ Respond with pure valid JSON only (no markdown, no backticks, no extra text):
       return res.json({ success: true, data: parsed, aiPowered: true });
     }
 
-    // Intelligent Fallback if GEMINI_API_KEY is not set
+    // Comprehensive Rule-Based Fallback
     const lower = text.toLowerCase();
-    const isExpense = lower.includes('spent') || lower.includes('paid ') || lower.includes('cost') || lower.includes('rupees') || lower.includes('rs') || lower.includes('₹');
-    const isBill = lower.includes('bill') || lower.includes('due') || lower.includes('credit card');
-
     const amountMatch = text.match(/(?:₹|rs\.?|rupees|inr)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/i);
     const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : undefined;
 
+    let type: 'task' | 'expense' | 'income' | 'bill' | 'debt' | 'transfer' = 'task';
+    let person: string | undefined = undefined;
+    let debtDirection: 'owe' | 'owed_to_me' | undefined = undefined;
     let category = 'Personal';
-    if (lower.includes('grocer') || lower.includes('milk') || lower.includes('vegetable')) category = 'Shopping';
-    else if (lower.includes('api') || lower.includes('code') || lower.includes('meeting') || lower.includes('work') || lower.includes('test')) category = 'Work';
-    else if (lower.includes('bill') || lower.includes('bank') || lower.includes('card') || lower.includes('money')) category = 'Finance';
-    else if (lower.includes('gym') || lower.includes('doctor') || lower.includes('run')) category = 'Health';
+    let sourceAccount: string | undefined = undefined;
+    let destinationAccount: string | undefined = undefined;
 
-    let context = undefined;
-    let location = undefined;
-    let locationBased = false;
-    if (lower.includes('coming back') || lower.includes('on way') || lower.includes('from office') || lower.includes('route')) {
-      context = 'Office → Home Commute';
-      location = 'Supermarket along commute route';
-      locationBased = true;
+    // Detect Debt
+    if (lower.includes('borrowed') || lower.includes('lent') || lower.includes('loan') || lower.includes('owe')) {
+      type = 'debt';
+      const nameMatch = text.match(/(?:from|to|by)\s+([A-Z][a-z]+)/i);
+      person = nameMatch ? nameMatch[1] : 'Counterparty';
+      
+      if (lower.includes('borrowed from') || lower.includes('i owe') || lower.includes('took loan')) {
+        debtDirection = 'owe';
+        category = 'Borrowed Money';
+      } else {
+        debtDirection = 'owed_to_me';
+        category = 'Lent Money';
+      }
+    } 
+    // Detect Transfer
+    else if (lower.includes('transfer') || lower.includes('moved ') || (lower.includes('from ') && lower.includes('to '))) {
+      type = 'transfer';
+      category = 'Transfer';
+      if (lower.includes('atm') || lower.includes('cash')) {
+        destinationAccount = 'ATM Cash';
+        sourceAccount = 'Bank Account';
+      }
+    }
+    // Detect Income
+    else if (lower.includes('salary') || lower.includes('received') || lower.includes('credited') || lower.includes('earned')) {
+      type = 'income';
+      category = lower.includes('salary') ? 'Salary' : 'Income';
+    }
+    // Detect Bill
+    else if (lower.includes('bill') || lower.includes('due on') || lower.includes('credit card due')) {
+      type = 'bill';
+      if (lower.includes('electr')) category = 'Electricity';
+      else if (lower.includes('rent')) category = 'Rent';
+      else if (lower.includes('internet') || lower.includes('wifi')) category = 'Internet';
+      else category = 'Bills';
+    }
+    // Detect Expense
+    else if (lower.includes('spent') || lower.includes('paid') || lower.includes('bought') || lower.includes('cost')) {
+      type = 'expense';
+      if (lower.includes('grocer') || lower.includes('milk') || lower.includes('vegetable')) category = 'Groceries';
+      else if (lower.includes('food') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('restaurant')) category = 'Food';
+      else if (lower.includes('uber') || lower.includes('petrol') || lower.includes('fuel') || lower.includes('auto')) category = 'Transport';
+      else category = 'Shopping';
+    }
+
+    // Extract Date Context
+    let dueDate = todayStr;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    if (lower.includes('tomorrow')) dueDate = tomorrowStr;
+    
+    // Extract Time Context
+    let startTime: string | undefined = undefined;
+    const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const mins = timeMatch[2] ? timeMatch[2] : '00';
+      const meridian = timeMatch[3].toLowerCase();
+      if (meridian === 'pm' && hours < 12) hours += 12;
+      if (meridian === 'am' && hours === 12) hours = 0;
+      startTime = `${hours.toString().padStart(2, '0')}:${mins}`;
     }
 
     const fallbackResult = {
-      type: isExpense ? 'expense' : (isBill ? 'bill' : 'task'),
-      title: text.replace(/^(remind me to|i have to|i need to|spent \d+ on|spent)\s*/i, '').trim(),
-      category: isExpense && category === 'Shopping' ? 'Groceries' : category,
-      amount: amount,
-      priority: lower.includes('urgent') || lower.includes('tomorrow') || lower.includes('friday') ? 'high' : 'medium',
-      dueDate: '2026-09-15',
-      context,
-      location,
-      locationBased,
-      recurring: lower.includes('every ') || lower.includes('weekly') || lower.includes('daily'),
-      isEssential: category === 'Groceries' || category === 'Bills',
+      type,
+      title: text.replace(/^(remind me to|i have to|i need to|spent \d+ on|spent|i borrowed \d+ from|transferred)\s*/i, '').trim(),
+      category,
+      amount,
+      person,
+      debtDirection,
+      sourceAccount,
+      destinationAccount,
+      priority: lower.includes('urgent') || lower.includes('tomorrow') ? 'high' : 'medium',
+      dueDate,
+      startTime,
+      isEssential: category === 'Groceries' || category === 'Bills' || category === 'Electricity',
     };
 
     return res.json({ success: true, data: fallbackResult, aiPowered: false });
@@ -190,35 +251,50 @@ Respond with JSON format:
       return res.json({ success: true, ...parsed, aiPowered: true });
     }
 
-    // High quality intelligent fallback if GEMINI_API_KEY is not set
+    // Dynamic context-based calculations for fallback if GEMINI_API_KEY is not set
     const lower = message.toLowerCase();
+    const accounts = Array.isArray(context?.bankAccounts) ? context.bankAccounts : [];
+    const cards = Array.isArray(context?.creditCards) ? context.creditCards : [];
+    const bills = Array.isArray(context?.bills) ? context.bills : [];
+    const debts = Array.isArray(context?.debts) ? context.debts : [];
+    const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+    const expenses = Array.isArray(context?.expenses) ? context.expenses : [];
+
+    const totalLiquid = accounts.reduce((s: number, a: any) => s + (Number(a.currentBalance) || 0), 0);
+    const totalLiabilities = cards.reduce((s: number, c: any) => s + (Number(c.currentOutstanding) || 0), 0) +
+      debts.filter((d: any) => d.direction === 'owe' && d.status !== 'settled').reduce((s: number, d: any) => s + (Number(d.outstandingAmount) || 0), 0);
+    const receivables = debts.filter((d: any) => d.direction === 'owed_to_me' && d.status !== 'settled').reduce((s: number, d: any) => s + (Number(d.outstandingAmount) || 0), 0);
+    const netWorth = totalLiquid + receivables - totalLiabilities;
+    const pendingBills = bills.filter((b: any) => b.status !== 'paid');
+    const pendingBillsSum = pendingBills.reduce((s: number, b: any) => s + (Number(b.amount) || 0), 0);
+    const pendingTasks = tasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress');
+
     let reply = '';
-    let suggestedActions = ['Plan my day', 'Show financial summary', 'Check schedule conflicts'];
+    let suggestedActions = ['Plan my day', 'Show financial summary', 'View pending tasks'];
 
-    if (lower.includes('what should i do') || lower.includes('today') || lower.includes('now')) {
-      reply = `**Here is your connected command center update for Tuesday, Sep 15:**
-
-1. **Current Focus**: Finish **Database Testing & Index Verification** before lunch (1:00 PM).
-2. **Upcoming Afternoon**: You have a **Code Review** session at 4:30 PM.
-3. **Smart Commute & Errand**: You are leaving the office at **18:30**. FreshMart is on your direct route home — your **Grocery Shopping** is planned for **19:00** so you don't have to make a separate trip later.
-4. **Finance Priority**: You have a **Bescom Electricity Bill (₹2,450)** scheduled for 21:00, and your **HDFC Credit Card bill (₹12,500)** is due in 5 days. You have **₹65,400** available in your salary account.
-
-Would you like me to generate an optimized time-blocked plan for today?`;
-      suggestedActions = ['✨ Plan My Day', 'Pay electricity bill', 'Review credit card details'];
-    } else if (lower.includes('financ') || lower.includes('money') || lower.includes('balance') || lower.includes('card')) {
-      reply = `### 💳 Financial Health Overview
-
-* **Total Available Liquid Cash**: ₹1,12,700 (HDFC Salary: ₹65,400 | SBI Savings: ₹42,500 | Cash: ₹4,800)
-* **Upcoming Bills Due**: ₹16,149 within 7 days (Electricity: ₹2,450 | Credit Card: ₹12,500 | Apartment: ₹3,500)
-* **Credit Card Outstanding**: ₹18,500 on HDFC Regalia (Statement Due: ₹12,500 by Sep 20)
-* **Monthly Savings Rate**: **41.6%** — You are on track for your **Emergency Fund** (₹65,000 / ₹1,00,000, 65%).
-
-**AI Recommendation**: Paying your credit card bill of ₹12,500 from your HDFC Salary account will leave you with a comfortable ₹52,900 balance before month-end salary credit.`;
-      suggestedActions = ['Pay HDFC Credit Card', 'Add expense', 'Check savings goals'];
+    if (lower.includes('what should i do') || lower.includes('today') || lower.includes('now') || lower.includes('schedule')) {
+      reply = `### 📋 Connected Command Center Status\n\n` +
+        `* **Pending Tasks**: You have **${pendingTasks.length}** pending tasks.\n` +
+        (pendingTasks.length > 0 ? `* **Next Up**: ${pendingTasks[0]?.title || 'Review your schedule'}\n` : '') +
+        `* **Upcoming Bills**: **${pendingBills.length}** bills totalling **₹${pendingBillsSum.toLocaleString('en-IN')}**.\n` +
+        `* **Net Worth**: **₹${netWorth.toLocaleString('en-IN')}** across **${accounts.length}** accounts.\n\n` +
+        `Would you like to plan your day or optimize your route?`;
+      suggestedActions = ['✨ Plan My Day', 'View Tasks', 'Check Bills'];
+    } else if (lower.includes('financ') || lower.includes('money') || lower.includes('balance') || lower.includes('net worth') || lower.includes('card') || lower.includes('debt')) {
+      const accountSummary = accounts.map((a: any) => `${a.name}: ₹${Number(a.currentBalance || 0).toLocaleString('en-IN')}`).join(' | ');
+      reply = `### 💳 Financial Ledger Overview\n\n` +
+        `* **Total Liquid Assets**: ₹${totalLiquid.toLocaleString('en-IN')} (${accountSummary || 'No accounts linked yet'})\n` +
+        `* **Total Liabilities**: ₹${totalLiabilities.toLocaleString('en-IN')} (Cards & Debts)\n` +
+        `* **Net Worth**: **₹${netWorth.toLocaleString('en-IN')}**\n` +
+        `* **Upcoming Bills**: ₹${pendingBillsSum.toLocaleString('en-IN')} (${pendingBills.length} pending)\n\n` +
+        `All calculations are strictly verified against your real database records.`;
+      suggestedActions = ['Record Expense', 'Pay a Bill', 'View Accounts'];
     } else {
-      reply = `I have updated your life dashboard. Your work schedule, commute route, and finances are fully synchronized.
-
-You currently have **2 tasks completed**, **3 tasks pending** for this evening, and **1 credit card bill due in 5 days**. Let me know if you want me to plan your day, optimize your schedule, or log an expense!`;
+      reply = `Command Center is active and synchronized with your database.\n\n` +
+        `* **Tasks**: ${pendingTasks.length} pending / ${tasks.length} total\n` +
+        `* **Accounts**: ₹${totalLiquid.toLocaleString('en-IN')} across ${accounts.length} accounts\n` +
+        `* **Net Worth**: ₹${netWorth.toLocaleString('en-IN')}\n\n` +
+        `How can I assist you with your day, schedule, or finances?`;
     }
 
     return res.json({

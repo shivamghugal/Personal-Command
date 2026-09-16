@@ -12,21 +12,30 @@ import {
   Settings, 
   Activity,
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  Bell,
+  Landmark,
+  ArrowLeftRight,
+  Scale
 } from 'lucide-react';
-import { BankAccount, Bill, Task } from '../types';
+import { BankAccount, Bill, Debt, NotificationItem, Task } from '../types';
 
 export type TabType = 
   | 'dashboard' 
   | 'tasks' 
   | 'calendar' 
   | 'finance' 
+  | 'accounts'
+  | 'cards'
+  | 'transactions'
+  | 'debts'
   | 'expenses' 
   | 'bills' 
   | 'goals' 
   | 'notes' 
   | 'ai' 
   | 'timeline' 
+  | 'notifications'
   | 'settings';
 
 interface SidebarProps {
@@ -35,6 +44,8 @@ interface SidebarProps {
   tasks: Task[];
   bills: Bill[];
   bankAccounts: BankAccount[];
+  debts?: Debt[];
+  notifications?: NotificationItem[];
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -45,26 +56,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   tasks = [],
   bills = [],
   bankAccounts = [],
+  debts = [],
+  notifications = [],
   isOpenMobile,
   onCloseMobile,
 }) => {
   const safeTasks = tasks || [];
   const safeBills = bills || [];
   const safeAccounts = bankAccounts || [];
+  const safeDebts = debts || [];
+  const safeNotifications = notifications || [];
 
   const pendingTasksCount = safeTasks.filter((t) => t.status === 'pending' || t.status === 'in_progress').length;
   const upcomingBillsCount = safeBills.filter((b) => b.status === 'upcoming' || b.status === 'due_today').length;
+  const activeDebtsCount = safeDebts.filter((d) => d.status === 'active' && d.direction === 'owe').length;
+  const unreadNotifCount = safeNotifications.filter((n) => !n.read).length;
   const totalBalance = safeAccounts.reduce((sum, acc) => sum + (acc.availableBalance || 0), 0);
 
   const navItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'tasks' as TabType, label: 'Tasks & Activities', icon: CheckSquare, badge: pendingTasksCount },
     { id: 'calendar' as TabType, label: 'Calendar & Schedule', icon: Calendar },
-    { id: 'finance' as TabType, label: 'Finance Overview', icon: Wallet },
-    { id: 'expenses' as TabType, label: 'Expense Tracking', icon: Receipt },
-    { id: 'bills' as TabType, label: 'Bills & Dues', icon: CreditCardIcon, badge: upcomingBillsCount, badgeColor: 'bg-amber-500/20 text-amber-300' },
+    { id: 'finance' as TabType, label: 'Finance Command', icon: Wallet },
+    { id: 'accounts' as TabType, label: 'Accounts & Cash', icon: Landmark },
+    { id: 'cards' as TabType, label: 'Credit Cards', icon: CreditCardIcon },
+    { id: 'transactions' as TabType, label: 'Transactions Ledger', icon: ArrowLeftRight },
+    { id: 'bills' as TabType, label: 'Bills & Dues', icon: Receipt, badge: upcomingBillsCount, badgeColor: 'bg-amber-500/20 text-amber-300' },
+    { id: 'debts' as TabType, label: 'Debts & Liabilities', icon: Scale, badge: activeDebtsCount > 0 ? activeDebtsCount : undefined, badgeColor: 'bg-rose-500/20 text-rose-300' },
     { id: 'goals' as TabType, label: 'Savings Goals', icon: Target },
     { id: 'timeline' as TabType, label: 'Connected Life Feed', icon: Activity },
+    { id: 'notifications' as TabType, label: 'Alerts & Notifications', icon: Bell, badge: unreadNotifCount, badgeColor: 'bg-amber-500/20 text-amber-300' },
     { id: 'notes' as TabType, label: 'Notes & AI Ideas', icon: FileText },
     { id: 'ai' as TabType, label: 'AI Life Assistant', icon: Sparkles, highlight: true },
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },

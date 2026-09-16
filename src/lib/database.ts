@@ -19,7 +19,9 @@ import {
   LifeEvent, 
   Note, 
   NotificationItem, 
-  UserPreferences 
+  UserPreferences,
+  Debt,
+  Transaction
 } from '../types';
 import {
   initialTasks,
@@ -32,7 +34,9 @@ import {
   initialLifeEvents,
   initialNotes,
   initialNotifications,
-  initialPreferences
+  initialPreferences,
+  initialDebts,
+  initialTransactions
 } from '../data/initialData';
 
 // Default clean preferences for Shivam
@@ -129,7 +133,9 @@ export async function resetDatabaseToFresh(): Promise<void> {
     'calendarEvents',
     'notes',
     'notifications',
-    'lifeEvents'
+    'lifeEvents',
+    'debts',
+    'transactions'
   ];
 
   for (const colName of collectionsToClear) {
@@ -165,6 +171,8 @@ export async function seedDemoData(): Promise<void> {
     { name: 'lifeEvents', items: initialLifeEvents },
     { name: 'notes', items: initialNotes },
     { name: 'notifications', items: initialNotifications },
+    { name: 'debts', items: initialDebts },
+    { name: 'transactions', items: initialTransactions },
   ];
 
   for (const col of collectionsMap) {

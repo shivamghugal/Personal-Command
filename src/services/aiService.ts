@@ -136,7 +136,9 @@ export const aiService = {
     bills: any[],
     bankAccounts: any[],
     expenses: any[],
-    preferences: any
+    preferences: any,
+    creditCards?: any[],
+    debts?: any[]
   ) => {
     try {
       const res = await fetch('/api/ai/chat', {
@@ -144,7 +146,7 @@ export const aiService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
-          context: { tasks, bills, bankAccounts, expenses, preferences },
+          context: { tasks, bills, bankAccounts, expenses, preferences, creditCards, debts },
         }),
       });
       if (res.ok) {
@@ -154,8 +156,8 @@ export const aiService = {
     } catch (e) {
       console.warn('Backend chat fallback:', e);
     }
-    // Fallback response with connected life context
-    return `I received your query: "${message}". Looking at your schedule, you have work until 18:30, after which you can stop by FreshMart for groceries on your commute home. Your HDFC account balance is ₹65,400 with ₹12,500 due on credit cards in 5 days.`;
+    const totalLiquid = (bankAccounts || []).reduce((s: number, a: any) => s + (Number(a.currentBalance) || 0), 0);
+    return `Query processed: "${message}". Your database currently reflects ₹${totalLiquid.toLocaleString('en-IN')} in accounts across ${(bankAccounts || []).length} registered accounts, ${(tasks || []).length} tasks, and ${(bills || []).length} tracked bills.`;
   },
 
   planDay: async (tasks: any[], bills: any[], preferences: any) => {
